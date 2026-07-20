@@ -107,10 +107,26 @@ function extractRows(json) {
   return rows
     .map((row) => {
       const cells = row.c || [];
-      const rawDate = cells[0] ? cells[0].v : null;
+      
+      // 1. Парсим дату: если есть форматированная строка (.f), берем её, иначе сырое значение (.v)
+      let rawDate = null;
+      if (cells[0]) {
+        rawDate = cells[0].f ? cells[0].f : cells[0].v;
+      }
+      
       const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : 'Неизвестно';
-      const rating = cells[2] ? Number(cells[2].v) : 0;
+      
+      // 2. Умный парсер оценки: чистим звезды и скобки вроде (2/5)
+      let rating = 0;
+      if (cells[2] && cells[2].v !== null && cells[2].v !== undefined) {
+        const rawRating = String(cells[2].v);
+        // Ищем цифру в скобках типа (5/5) или просто первую цифру в строке
+        const ratingMatch = rawRating.match(/\((\d)\/\d\)/) || rawRating.match(/\d/);
+        rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[0]) : 0;
+      }
+      
       const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
+      
       return buildRow(rawDate, barista, rating, comment);
     })
     .filter((row) => row.rating > 0);
