@@ -27,6 +27,9 @@ const fallbackData = [
 // Все загруженные отзывы храним в памяти — фильтруем без повторных запросов к сети
 let allRows = [];
 
+// Полный список сотрудников (собирается один раз, чтобы карточки не "прыгали" при смене месяца)
+let staffRoster = [];
+
 // Состояния фильтров
 let selectedBarista = null;
 let onlyNegative = false;
@@ -102,43 +105,6 @@ function formatDateParts(dateParts) {
   return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
-function extractRows(json) {
-  const rows = json.table && json.table.rows ? json.table.rows : [];
-  return rows
-    .map((row) => {
-      const cells = row.c || [];
-      
-      // 1. Парсим дату: если есть форматированная строка (.f), берем её, иначе сырое значение (.v)
-      let rawDate = null;
-      if (cells[0]) {
-        rawDate = cells[0].f ? cells[0].f : cells[0].v;
-      }
-      
-      const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : 'Неизвестно';
-      
-      // 2. Умный парсер оценки: чистим звезды и скобки вроде (2/5)
-      let rating = 0;
-      if (cells[2] && cells[2].v !== null && cells[2].v !== undefined) {
-        const rawRating = String(cells[2].v);
-        
-        // Проверяем, если это просто чистое число (как в первых строках)
-        if (!isNaN(rawRating) && rawRating.trim() !== '') {
-          rating = Number(rawRating);
-        } else {
-          // Если это строка со звездами, ищем цифру перед слэшем или внутри скобок
-          const ratingMatch = rawRating.match(/\((\d)\/\d\)/) || rawRating.match(/\d/);
-          // Исправлено: берем ratingMatch[1] (группа в скобках), а если её нет — ratingMatch[0] (первая цифра)
-          rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[0]) : 0;
-        }
-      }
-      
-      const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
-      
-      return buildRow(rawDate, barista, rating, comment);
-    })
-    .filter((row) => row.rating > 0);
-}
-
 function buildRow(rawDate, barista, rating, comment) {
   const dateParts = parseDateSafe(rawDate);
   return {
@@ -151,6 +117,59 @@ function buildRow(rawDate, barista, rating, comment) {
   };
 }
 
+/* ---------- Железобетонный парсер строк таблицы ---------- */
+
+function extractRows(json) {
+  const rows = json.table && json.table.rows ? json.table.rows : [];
+  return rows
+    .map((row) => {
+      const cells = row.c || [];
+
+      // Парсинг даты: если есть форматированная строка (.f), берем её, иначе сырое значение (.v)
+      let rawDate = null;
+      if (cells[0]) {
+        rawDate = cells[0].f ? cells[0].f : cells[0].v;
+      }
+
+      const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : 'Неизвестно';
+
+      // Умный парсер оценки: чистим звезды и скобки вроде (2/5), проверяем на чистое число
+      let rating = 0;
+      if (cells[2] && cells[2].v !== null && cells[2].v !== undefined) {
+        const rawRating = String(cells[2].v);
+        if (!isNaN(rawRating) && rawRating.trim() !== '') {
+          rating = Number(rawRating);
+        } else {
+          const ratingMatch = rawRating.match(/\((\d)\/\d\)/) || rawRating.match(/\d/);
+          rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[0]) : 0;
+        }
+      }
+
+      const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
+
+      return buildRow(rawDate, barista, rating, comment);
+    })
+    .filter((row) => row.rating > 0);
+}
+
+/* ---------- Сортировка по свежести (новые сверху) ---------- */
+
+function dateSortValue(dateParts) {
+  // Отсутствующая дата уходит в конец списка, а не ломает сортировку
+  if (!dateParts) return -1;
+  return dateParts.year * 10000 + dateParts.month * 100 + dateParts.day;
+}
+
+function compareRowsByDateDesc(rowA, rowB) {
+  return dateSortValue(rowB.dateParts) - dateSortValue(rowA.dateParts);
+}
+
+function sortRowsByDateDesc(rows) {
+  return rows.slice().sort(compareRowsByDateDesc);
+}
+
+/* ---------- Загрузка данных ---------- */
+
 async function fetchData() {
   try {
     const response = await fetch(SHEET_URL);
@@ -159,11 +178,13 @@ async function fetchData() {
     const json = parseGvizResponse(text);
     const rows = extractRows(json);
     if (!rows.length) throw new Error('Таблица пуста');
-    allRows = rows;
+    allRows = sortRowsByDateDesc(rows);
   } catch (error) {
     console.warn('Не удалось загрузить данные из Google Sheets, используются тестовые данные.', error);
-    allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
+    const parsedFallback = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
+    allRows = sortRowsByDateDesc(parsedFallback);
   }
+  staffRoster = Array.from(new Set(allRows.map((row) => row.barista))).sort();
   populateMonthSelect();
   renderDashboard();
 }
@@ -176,33 +197,54 @@ function pluralizeReviews(count) {
   return 'отзывов';
 }
 
-function computeStats(rows) {
-  const totalReviews = rows.length;
-  const totalScore = rows.reduce((sum, row) => sum + row.rating, 0);
-  const avgRating = totalReviews ? totalScore / totalReviews : 0;
+/* ---------- Фильтрация по месяцу (глобальная) ---------- */
 
-  // Список сотрудников собирается динамически, без хардкода имён
-  const staffNames = new Set(rows.map((row) => row.barista));
+function getMonthRows(monthKey) {
+  if (monthKey === 'all') return allRows;
+  return allRows.filter((row) => row.monthKey === monthKey);
+}
 
+/* ---------- Комбинированная фильтрация: месяц + сотрудник + негатив ---------- */
+
+function getDisplayRows() {
+  const monthRows = getMonthRows(selectedMonthKey);
+  return monthRows.filter((row) => {
+    if (selectedBarista && row.barista !== selectedBarista) return false;
+    if (onlyNegative && row.rating > 3) return false;
+    return true;
+  });
+}
+
+function computeTeamStats(rows) {
   const grouped = {};
-  staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
+  staffRoster.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
+
   rows.forEach((row) => {
+    if (!grouped[row.barista]) {
+      grouped[row.barista] = { count: 0, total: 0 };
+    }
     grouped[row.barista].count += 1;
     grouped[row.barista].total += row.rating;
   });
 
-  const team = Array.from(staffNames)
-    .map((name) => ({
-      name,
-      count: grouped[name].count,
-      avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
-    }))
-    .filter((member) => member.count > 0)
-    .sort((a, b) => b.avg - a.avg);
+  return staffRoster.map((name) => ({
+    name,
+    count: grouped[name].count,
+    avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
+  }));
+}
 
-  const best = team.length ? team[0] : null;
+function computeOverallStats(rows) {
+  const totalReviews = rows.length;
+  const totalScore = rows.reduce((sum, row) => sum + row.rating, 0);
+  const avgRating = totalReviews ? totalScore / totalReviews : 0;
+  return { totalReviews, avgRating };
+}
 
-  return { totalReviews, avgRating, team, best };
+function getBestOfTeam(team) {
+  const withReviews = team.filter((member) => member.count > 0);
+  if (!withReviews.length) return null;
+  return withReviews.slice().sort((a, b) => b.avg - a.avg)[0];
 }
 
 /* ---------- Заполнение селекта месяцев ---------- */
@@ -236,25 +278,10 @@ function populateMonthSelect() {
   selectedMonthKey = select.value;
 }
 
-/* ---------- Комбинированная фильтрация в памяти ---------- */
+/* ---------- Рендер: шапка ---------- */
 
-function getDisplayRows() {
-  return allRows.filter((row) => {
-    if (selectedBarista && row.barista !== selectedBarista) return false;
-    if (onlyNegative && row.rating > 3) return false;
-    return true;
-  });
-}
-
-function getMonthRows(monthKey) {
-  if (monthKey === 'all') return allRows;
-  return allRows.filter((row) => row.monthKey === monthKey);
-}
-
-/* ---------- Рендер отдельных блоков ---------- */
-
-function renderHeaderStats(filteredRows) {
-  const stats = computeStats(filteredRows);
+function renderHeaderStats(monthRows, displayRows) {
+  const stats = computeOverallStats(displayRows);
   document.getElementById('stat-total-reviews').textContent = String(stats.totalReviews);
   document.getElementById('stat-avg-rating').textContent = stats.avgRating.toFixed(1);
 
@@ -262,42 +289,49 @@ function renderHeaderStats(filteredRows) {
   const avgLabel = document.getElementById('stat-avg-label');
 
   const scopeParts = [];
+  if (selectedMonthKey !== 'all') {
+    const [year, month] = selectedMonthKey.split('-').map(Number);
+    scopeParts.push(`${monthNames[month - 1]} ${year}`);
+  }
   if (selectedBarista) scopeParts.push(selectedBarista);
   if (onlyNegative) scopeParts.push('негативные');
-  const scopeSuffix = scopeParts.length ? ` · ${scopeParts.join(', ')}` : '';
 
-  totalLabel.textContent = `Отзывов${scopeSuffix ? scopeSuffix : ''}`.trim();
-  avgLabel.textContent = `Средний балл${scopeSuffix ? scopeSuffix : ''}`.trim();
-
-  if (!selectedBarista && !onlyNegative) {
+  if (scopeParts.length) {
+    totalLabel.textContent = `Отзывов · ${scopeParts.join(', ')}`;
+    avgLabel.textContent = `Средний балл · ${scopeParts.join(', ')}`;
+  } else {
     totalLabel.textContent = 'Всего отзывов';
     avgLabel.textContent = 'Средний балл';
   }
 }
 
-function renderBestEmployee() {
-  const monthRows = getMonthRows(selectedMonthKey);
-  const stats = computeStats(monthRows);
+/* ---------- Рендер: лучший сотрудник (по выбранному месяцу) ---------- */
+
+function renderBestEmployee(monthRows) {
+  const team = computeTeamStats(monthRows);
+  const best = getBestOfTeam(team);
 
   const nameEl = document.getElementById('best-name');
   const scoreEl = document.getElementById('best-score');
 
-  if (!stats.best) {
+  if (!best) {
     nameEl.textContent = 'Нет данных за этот период';
     scoreEl.textContent = '';
     return;
   }
 
-  nameEl.textContent = stats.best.name;
-  scoreEl.textContent = `${stats.best.avg.toFixed(1)} из 5 · ${stats.best.count} ${pluralizeReviews(stats.best.count)}`;
+  nameEl.textContent = best.name;
+  scoreEl.textContent = `${best.avg.toFixed(1)} из 5 · ${best.count} ${pluralizeReviews(best.count)}`;
 }
 
-function renderTeamGrid() {
-  const stats = computeStats(allRows);
+/* ---------- Рендер: карточки команды (по выбранному месяцу) ---------- */
+
+function renderTeamGrid(monthRows) {
+  const team = computeTeamStats(monthRows);
   const grid = document.getElementById('team-grid');
   grid.innerHTML = '';
 
-  if (!stats.team.length) {
+  if (!team.length) {
     const placeholder = document.createElement('div');
     placeholder.className = 'state-placeholder';
     placeholder.textContent = 'Нет данных по команде';
@@ -305,7 +339,7 @@ function renderTeamGrid() {
     return;
   }
 
-  stats.team.forEach((member) => {
+  team.forEach((member) => {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'team-card';
@@ -327,7 +361,9 @@ function renderTeamGrid() {
 
     const count = document.createElement('div');
     count.className = 'team-count';
-    count.textContent = `${member.count} ${pluralizeReviews(member.count)}`;
+    count.textContent = member.count
+      ? `${member.count} ${pluralizeReviews(member.count)}`
+      : 'Нет отзывов за период';
 
     nameBlock.appendChild(name);
     nameBlock.appendChild(count);
@@ -339,7 +375,7 @@ function renderTeamGrid() {
 
     const scoreValue = document.createElement('span');
     scoreValue.className = 'team-score-value';
-    scoreValue.textContent = member.avg.toFixed(1);
+    scoreValue.textContent = member.count ? member.avg.toFixed(1) : '—';
 
     const scoreMax = document.createElement('span');
     scoreMax.className = 'team-score-max';
@@ -353,7 +389,7 @@ function renderTeamGrid() {
 
     const progressFill = document.createElement('div');
     progressFill.className = 'progress-fill';
-    progressFill.style.width = `${Math.min((member.avg / 5) * 100, 100)}%`;
+    progressFill.style.width = `${member.count ? Math.min((member.avg / 5) * 100, 100) : 0}%`;
 
     progressTrack.appendChild(progressFill);
 
@@ -370,7 +406,7 @@ function renderTeamGrid() {
   });
 }
 
-/* ---------- Лента отзывов с эффектом "тумана" ---------- */
+/* ---------- Лента отзывов (месяц + сотрудник + негатив, свежие сверху) ---------- */
 
 function getStaggerDelay(index) {
   const SLOW_STEP = 100;
@@ -383,17 +419,21 @@ function getStaggerDelay(index) {
   return SLOW_COUNT * SLOW_STEP + (index - SLOW_COUNT + 1) * FAST_STEP;
 }
 
-function renderReviewsFeed(filteredRows) {
+function renderReviewsFeed(displayRows) {
   const feed = document.getElementById('reviews-feed');
   const titleEl = document.getElementById('reviews-title');
   feed.innerHTML = '';
 
   const titleParts = [];
+  if (selectedMonthKey !== 'all') {
+    const [year, month] = selectedMonthKey.split('-').map(Number);
+    titleParts.push(`${monthNames[month - 1]} ${year}`);
+  }
   if (selectedBarista) titleParts.push(selectedBarista);
   if (onlyNegative) titleParts.push('только негативные');
   titleEl.textContent = titleParts.length ? `Отзывы · ${titleParts.join(', ')}` : 'Последние отзывы';
 
-  if (!filteredRows.length) {
+  if (!displayRows.length) {
     const placeholder = document.createElement('div');
     placeholder.className = 'state-placeholder';
     placeholder.textContent = 'По этому фильтру отзывов нет';
@@ -401,9 +441,8 @@ function renderReviewsFeed(filteredRows) {
     return;
   }
 
-  const recentRows = filteredRows.slice().reverse();
-
-  recentRows.forEach((row, index) => {
+  // displayRows уже отсортированы по свежести на этапе загрузки, порядок сохраняется при фильтрации
+  displayRows.forEach((row, index) => {
     const isNegative = row.rating <= 3;
 
     const item = document.createElement('div');
@@ -450,13 +489,16 @@ function renderFilterButtons() {
   negativeBtn.classList.toggle('is-active', onlyNegative);
 }
 
-function renderDashboard() {
-  renderBestEmployee();
-  renderTeamGrid();
+/* ---------- Главная функция рендера ---------- */
 
-  const filteredRows = getDisplayRows();
-  renderHeaderStats(filteredRows);
-  renderReviewsFeed(filteredRows);
+function renderDashboard() {
+  const monthRows = getMonthRows(selectedMonthKey);
+  const displayRows = getDisplayRows();
+
+  renderBestEmployee(monthRows);
+  renderTeamGrid(monthRows);
+  renderHeaderStats(monthRows, displayRows);
+  renderReviewsFeed(displayRows);
   renderFilterButtons();
 }
 
@@ -472,7 +514,7 @@ document.getElementById('negative-filter-btn').addEventListener('click', () => {
 
 document.getElementById('month-select').addEventListener('change', (event) => {
   selectedMonthKey = event.target.value;
-  renderBestEmployee();
+  renderDashboard();
 });
 
 fetchData();
