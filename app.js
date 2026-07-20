@@ -120,9 +120,16 @@ function extractRows(json) {
       let rating = 0;
       if (cells[2] && cells[2].v !== null && cells[2].v !== undefined) {
         const rawRating = String(cells[2].v);
-        // Ищем цифру в скобках типа (5/5) или просто первую цифру в строке
-        const ratingMatch = rawRating.match(/\((\d)\/\d\)/) || rawRating.match(/\d/);
-        rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[0]) : 0;
+        
+        // Проверяем, если это просто чистое число (как в первых строках)
+        if (!isNaN(rawRating) && rawRating.trim() !== '') {
+          rating = Number(rawRating);
+        } else {
+          // Если это строка со звездами, ищем цифру перед слэшем или внутри скобок
+          const ratingMatch = rawRating.match(/\((\d)\/\d\)/) || rawRating.match(/\d/);
+          // Исправлено: берем ratingMatch[1] (группа в скобках), а если её нет — ratingMatch[0] (первая цифра)
+          rating = ratingMatch ? Number(ratingMatch[1] || ratingMatch[0]) : 0;
+        }
       }
       
       const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
