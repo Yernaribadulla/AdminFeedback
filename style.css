@@ -1,0 +1,476 @@
+:root {
+  --color-bg: #0d0d0f;
+  --color-bg-deep: #08080a;
+  --color-card: #18181b;
+  --color-card-alt: #1e1e22;
+  --color-line: #2a2a2e;
+
+  --color-accent: #c9a667;
+  --color-accent-bright: #dfc088;
+  --color-accent-dim: rgba(201, 166, 103, 0.14);
+
+  --color-warning: #c97a67;
+  --color-warning-bright: #e2977f;
+  --color-warning-dim: rgba(201, 122, 103, 0.14);
+
+  --color-text: #f3f3f4;
+  --color-text-muted: #8b8b91;
+  --color-text-faint: #545458;
+
+  --font-display: "Fraunces", serif;
+  --font-body: "Inter", -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+.dashboard {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+/* ---------- Шапка ---------- */
+
+.dash-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.brand-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.brand-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 32px;
+  margin-top: 10px;
+  letter-spacing: -0.01em;
+}
+
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.stat-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--color-text);
+  transition: color 0.3s ease;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  text-align: right;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--color-line);
+}
+
+/* ---------- Лучший сотрудник ---------- */
+
+.best-employee {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+  background: linear-gradient(135deg, var(--color-card) 0%, var(--color-card-alt) 100%);
+  border: 1px solid var(--color-accent);
+  border-radius: 14px;
+  padding: 28px 32px;
+}
+
+.best-employee-icon {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-accent-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.best-employee-icon svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: var(--color-accent-bright);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.best-employee-info {
+  flex: 1 1 auto;
+}
+
+.best-employee-label {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.best-employee-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 26px;
+  margin-top: 6px;
+}
+
+.best-employee-score {
+  display: inline-block;
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--color-accent-bright);
+}
+
+.month-select-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.month-select-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.month-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--color-bg-deep) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23c9a667" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>') no-repeat right 12px center / 14px;
+  border: 1px solid var(--color-line);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 36px 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.25s ease;
+}
+
+.month-select:hover,
+.month-select:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+/* ---------- Секции ---------- */
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.team-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid var(--color-line);
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 9px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.25s ease, color 0.25s ease, background 0.25s ease;
+}
+
+.filter-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: var(--color-accent-dim);
+}
+
+.filter-btn:active { transform: scale(0.97); }
+
+.filter-btn.is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.warning-icon {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.warning-btn.is-active {
+  border-color: var(--color-warning);
+  color: var(--color-warning-bright);
+  background: var(--color-warning-dim);
+}
+
+.state-placeholder {
+  color: var(--color-text-faint);
+  font-size: 14px;
+  padding: 20px 0;
+}
+
+/* ---------- Гибкая сетка команды ---------- */
+
+.team-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.team-card {
+  display: block;
+  flex: 1 1 calc(33.333% - 20px);
+  min-width: 250px;
+  text-align: left;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  padding: 22px;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.25s ease, transform 0.2s ease, background 0.25s ease;
+}
+
+.team-card:hover {
+  border-color: var(--color-accent);
+  transform: scale(1.02);
+  background: var(--color-card-alt);
+}
+
+.team-card:active { transform: scale(0.99); }
+
+.team-card:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.team-card.active-card {
+  border-color: var(--color-accent-bright);
+  background: var(--color-card-alt);
+  box-shadow: 0 0 0 1px var(--color-accent-bright), 0 12px 28px -16px rgba(201, 166, 103, 0.45);
+}
+
+.team-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.team-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-accent-dim);
+  color: var(--color-accent-bright);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.team-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.team-count {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.team-score-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+
+.team-score-value {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  color: var(--color-text);
+}
+
+.team-score-max {
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.progress-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-line);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-accent);
+  transition: width 0.6s ease;
+}
+
+/* ---------- Лента отзывов ---------- */
+
+.reviews-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  opacity: 0;
+  transform: translateY(8px);
+  animation-name: fogIn;
+  animation-duration: 0.5s;
+  animation-timing-function: ease;
+  animation-fill-mode: forwards;
+}
+
+.review-item.is-negative {
+  border-color: var(--color-warning);
+}
+
+.review-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.review-barista {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.review-date {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.review-rating {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-bg);
+  background: var(--color-accent);
+  padding: 3px 9px;
+  border-radius: 999px;
+  margin-left: auto;
+}
+
+.review-rating.is-negative {
+  background: var(--color-warning);
+}
+
+.review-comment {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+@keyframes fogIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Адаптив ---------- */
+
+@media (max-width: 640px) {
+  .dashboard { padding: 28px 16px 60px; gap: 28px; }
+  .dash-header { flex-direction: column; align-items: flex-start; }
+  .header-stats { align-self: stretch; justify-content: space-between; }
+  .stat-widget { align-items: flex-start; }
+  .stat-label { text-align: left; }
+  .best-employee { flex-direction: column; align-items: stretch; text-align: center; padding: 26px 20px; }
+  .month-select-wrap { margin-left: 0; align-items: center; }
+  .brand-title { font-size: 26px; }
+  .review-rating { margin-left: 0; }
+  .team-section-header { align-items: flex-start; flex-direction: column; }
+  .team-card { flex: 1 1 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-item { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
