@@ -1,4 +1,4 @@
-const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
+const sheetId = 'YOUR_SHEET_ID';
 const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
 
 const monthNames = [
@@ -6,34 +6,48 @@ const monthNames = [
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
 ];
 
+// Мок-значение сканов QR — пока нет реальной аналитики сканирований,
+// используется как база для карточки конверсии в Executive Snapshot
+const MOCK_QR_SCANS = 140;
+
 const fallbackData = [
-  { date: '14.07.2026 9:32:10', barista: 'Ислам', rating: 5, comment: 'Очень тепло встретил, кофе идеальный.' },
-  { date: '2026-07-13T18:04:00', barista: 'Диас', rating: 4, comment: 'Быстро и вкусно, но было многолюдно.' },
-  { date: '12.07.2026 8:15:47', barista: 'Баха', rating: 5, comment: 'Лучший раф на пирсе, спасибо!' },
-  { date: '2026-07-11T11:20:33', barista: 'Ислам', rating: 5, comment: 'Приятная атмосфера и внимательный сервис.' },
-  { date: '10.07.2026 19:41:02', barista: 'Диас', rating: 5, comment: 'Отличная подача, красиво оформили латте-арт.' },
-  { date: '2026-07-09T07:58:19', barista: 'Баха', rating: 2, comment: 'Ждали заказ почти двадцать минут.' },
-  { date: '08.07.2026 12:03:55', barista: 'Ислам', rating: 4, comment: 'Хороший кофе, немного шумно у пирса.' },
-  { date: '2026-07-07T16:44:10', barista: 'Диас', rating: 5, comment: 'Порекомендовал напиток по вкусу — попал в точку.' },
-  { date: '06.07.2026 9:29:00', barista: 'Баха', rating: 5, comment: 'Очень дружелюбно и профессионально.' },
-  { date: '2026-07-05T14:12:47', barista: 'Ислам', rating: 3, comment: 'Кофе остыл, пока несли к столику.' },
-  { date: '04.06.2026 10:05:22', barista: 'Диас', rating: 2, comment: 'Перепутали заказ, пришлось ждать замену.' },
-  { date: '2026-06-28T09:17:41', barista: 'Баха', rating: 5, comment: 'Прекрасный сервис, как всегда.' },
-  { date: '20.06.2026 17:50:03', barista: 'Ислам', rating: 5, comment: 'Спасибо за рекомендацию по вкусу!' },
-  { date: '2026-06-15T13:33:29', barista: 'Диас', rating: 1, comment: 'Грубо ответил на просьбу пересчитать.' },
-  { date: '10.06.2026 8:47:15', barista: 'Баха', rating: 4, comment: 'Всё хорошо, чуть медленно в час пик.' }
+  { date: '21.07.2026 8:12:00', barista: 'Ислам', rating: 2, comment: 'Долго ждал заказ этим утром.' },
+  { date: '21.07.2026 10:45:00', barista: 'Диас', rating: 5, comment: 'Отличное начало дня, спасибо!' },
+  { date: '20.07.2026 19:32:10', barista: 'Баха', rating: 5, comment: 'Лучший раф на пирсе.' },
+  { date: '19.07.2026 9:12:47', barista: 'Ислам', rating: 4, comment: 'Хорошо, но немного шумно.' },
+  { date: '18.07.2026 18:04:00', barista: 'Диас', rating: 3, comment: 'Средне, ожидал большего.' },
+  { date: '17.07.2026 8:15:47', barista: 'Баха', rating: 5, comment: 'Прекрасный сервис.' },
+  { date: '16.07.2026 11:20:33', barista: 'Ислам', rating: 5, comment: 'Очень приятная атмосфера.' },
+  { date: '15.07.2026 19:41:02', barista: 'Диас', rating: 5, comment: 'Красиво оформили латте-арт.' },
+  { date: '14.07.2026 7:58:19', barista: 'Баха', rating: 2, comment: 'Ждали заказ почти двадцать минут.' },
+  { date: '13.07.2026 12:03:55', barista: 'Ислам', rating: 4, comment: 'Хороший кофе.' },
+  { date: '12.07.2026 16:44:10', barista: 'Диас', rating: 5, comment: 'Попал в точку со вкусом.' },
+  { date: '11.07.2026 9:29:00', barista: 'Баха', rating: 5, comment: 'Очень дружелюбно.' },
+  { date: '10.07.2026 14:12:47', barista: 'Ислам', rating: 3, comment: 'Кофе остыл, пока несли.' },
+  { date: '04.06.2026 10:05:22', barista: 'Диас', rating: 2, comment: 'Перепутали заказ.' },
+  { date: '28.06.2026 9:17:41', barista: 'Баха', rating: 5, comment: 'Как всегда прекрасно.' },
+  { date: '20.06.2026 17:50:03', barista: 'Ислам', rating: 5, comment: 'Спасибо за рекомендацию!' },
+  { date: '15.06.2026 13:33:29', barista: 'Диас', rating: 1, comment: 'Грубо ответил на просьбу пересчитать.' },
+  { date: '10.06.2026 8:47:15', barista: 'Баха', rating: 4, comment: 'Чуть медленно в час пик.' }
 ];
 
-// Все загруженные отзывы храним в памяти — фильтруем без повторных запросов к сети
+// Все загруженные отзывы храним в памяти — фильтруем и удаляем без повторных запросов к сети
 let allRows = [];
 
 // Полный список сотрудников (собирается один раз, чтобы карточки не "прыгали" при смене месяца)
 let staffRoster = [];
 
+// Опорная "текущая дата" дашборда — последняя дата в данных
+// (см. п.1 требований: считаем от последних записей или системного времени)
+let referenceDate = new Date();
+
 // Состояния фильтров
 let selectedBarista = null;
 let onlyNegative = false;
 let selectedMonthKey = 'all';
+
+// Счётчик для присвоения уникальных id строкам (нужно для удаления отзывов)
+let rowIdCounter = 0;
 
 function parseGvizResponse(text) {
   const match = text.match(/setResponse\(([\s\S]*)\);?\s*$/);
@@ -44,73 +58,84 @@ function parseGvizResponse(text) {
 }
 
 /**
- * Надёжно разбирает дату из Google Sheets в разных форматах:
+ * Надёжно разбирает дату из Google Sheets в разных форматах и возвращает объект Date:
  * - объект gviz: Date(2026,6,19,...)
- * - "19.07.2026 0:01:35" (день.месяц.год + время)
- * - "2026-07-19T00:01:35" (ISO + время)
- * Игнорирует время, возвращает { year, month, day } с месяцем 1–12,
- * либо null, если строку разобрать не удалось.
+ * - "19.07.2026 0:01:35" (ДД.ММ.ГГГГ, ЧЧ:ММ:СС)
+ * - "2026-07-19T00:01:35" (ISO)
+ * Время учитывается там, где оно есть; если распознать не удалось — возвращает null.
  */
 function parseDateSafe(rawValue) {
   if (!rawValue) return null;
   const value = String(rawValue).trim();
 
-  const gvizMatch = /^Date\((\d+),(\d+),(\d+)/.exec(value);
+  const gvizMatch = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?/.exec(value);
   if (gvizMatch) {
-    return {
-      year: Number(gvizMatch[1]),
-      month: Number(gvizMatch[2]) + 1,
-      day: Number(gvizMatch[3])
-    };
+    return new Date(
+      Number(gvizMatch[1]),
+      Number(gvizMatch[2]),
+      Number(gvizMatch[3]),
+      Number(gvizMatch[4] || 0),
+      Number(gvizMatch[5] || 0),
+      Number(gvizMatch[6] || 0)
+    );
   }
 
-  const dottedMatch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(value);
+  // ДД.ММ.ГГГГ ЧЧ:ММ:СС (время опционально)
+  const dottedMatch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/.exec(value);
   if (dottedMatch) {
-    return {
-      year: Number(dottedMatch[3]),
-      month: Number(dottedMatch[2]),
-      day: Number(dottedMatch[1])
-    };
+    return new Date(
+      Number(dottedMatch[3]),
+      Number(dottedMatch[2]) - 1,
+      Number(dottedMatch[1]),
+      Number(dottedMatch[4] || 0),
+      Number(dottedMatch[5] || 0),
+      Number(dottedMatch[6] || 0)
+    );
   }
 
+  // ISO-подобные строки
   const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(value);
   if (isoMatch) {
-    return {
-      year: Number(isoMatch[1]),
-      month: Number(isoMatch[2]),
-      day: Number(isoMatch[3])
-    };
+    const fallbackIso = new Date(value);
+    if (!Number.isNaN(fallbackIso.getTime())) return fallbackIso;
+    return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
   }
 
-  const fallbackParsed = new Date(value);
-  if (!Number.isNaN(fallbackParsed.getTime())) {
-    return {
-      year: fallbackParsed.getFullYear(),
-      month: fallbackParsed.getMonth() + 1,
-      day: fallbackParsed.getDate()
-    };
-  }
-
-  return null;
+  const generic = new Date(value);
+  return Number.isNaN(generic.getTime()) ? null : generic;
 }
 
-function monthKeyOf(dateParts) {
-  if (!dateParts) return null;
-  return `${dateParts.year}-${String(dateParts.month).padStart(2, '0')}`;
+function monthKeyOf(dateObj) {
+  if (!dateObj) return null;
+  return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function formatDateParts(dateParts) {
-  if (!dateParts) return '';
-  const d = new Date(dateParts.year, dateParts.month - 1, dateParts.day);
-  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+function formatDateObj(dateObj) {
+  if (!dateObj) return '';
+  return dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function isSameCalendarDay(dateA, dateB) {
+  return dateA.getFullYear() === dateB.getFullYear()
+    && dateA.getMonth() === dateB.getMonth()
+    && dateA.getDate() === dateB.getDate();
+}
+
+function daysBetween(dateA, dateB) {
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  const startOfA = new Date(dateA.getFullYear(), dateA.getMonth(), dateA.getDate());
+  const startOfB = new Date(dateB.getFullYear(), dateB.getMonth(), dateB.getDate());
+  return Math.round((startOfA - startOfB) / MS_PER_DAY);
 }
 
 function buildRow(rawDate, barista, rating, comment) {
-  const dateParts = parseDateSafe(rawDate);
+  const dateObj = parseDateSafe(rawDate);
+  rowIdCounter += 1;
   return {
-    dateParts,
-    monthKey: monthKeyOf(dateParts),
-    dateLabel: formatDateParts(dateParts),
+    id: rowIdCounter,
+    dateObj,
+    monthKey: monthKeyOf(dateObj),
+    dateLabel: formatDateObj(dateObj),
     barista,
     rating,
     comment
@@ -125,7 +150,6 @@ function extractRows(json) {
     .map((row) => {
       const cells = row.c || [];
 
-      // Парсинг даты: если есть форматированная строка (.f), берем её, иначе сырое значение (.v)
       let rawDate = null;
       if (cells[0]) {
         rawDate = cells[0].f ? cells[0].f : cells[0].v;
@@ -154,14 +178,13 @@ function extractRows(json) {
 
 /* ---------- Сортировка по свежести (новые сверху) ---------- */
 
-function dateSortValue(dateParts) {
+function dateSortValue(dateObj) {
   // Отсутствующая дата уходит в конец списка, а не ломает сортировку
-  if (!dateParts) return -1;
-  return dateParts.year * 10000 + dateParts.month * 100 + dateParts.day;
+  return dateObj ? dateObj.getTime() : -Infinity;
 }
 
 function compareRowsByDateDesc(rowA, rowB) {
-  return dateSortValue(rowB.dateParts) - dateSortValue(rowA.dateParts);
+  return dateSortValue(rowB.dateObj) - dateSortValue(rowA.dateObj);
 }
 
 function sortRowsByDateDesc(rows) {
@@ -184,6 +207,10 @@ async function fetchData() {
     const parsedFallback = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
     allRows = sortRowsByDateDesc(parsedFallback);
   }
+
+  const datesWithValue = allRows.map((row) => row.dateObj).filter(Boolean);
+  referenceDate = datesWithValue.length ? datesWithValue.reduce((a, b) => (a > b ? a : b)) : new Date();
+
   staffRoster = Array.from(new Set(allRows.map((row) => row.barista))).sort();
   populateMonthSelect();
   renderDashboard();
@@ -220,9 +247,7 @@ function computeTeamStats(rows) {
   staffRoster.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
 
   rows.forEach((row) => {
-    if (!grouped[row.barista]) {
-      grouped[row.barista] = { count: 0, total: 0 };
-    }
+    if (!grouped[row.barista]) grouped[row.barista] = { count: 0, total: 0 };
     grouped[row.barista].count += 1;
     grouped[row.barista].total += row.rating;
   });
@@ -247,16 +272,79 @@ function getBestOfTeam(team) {
   return withReviews.slice().sort((a, b) => b.avg - a.avg)[0];
 }
 
+/* ---------- Executive Snapshot ---------- */
+
+function renderSnapshot() {
+  const todayRows = allRows.filter((row) => row.dateObj && isSameCalendarDay(row.dateObj, referenceDate));
+  const negativeToday = todayRows.filter((row) => row.rating <= 3).length;
+
+  const negCard = document.getElementById('snapshot-negative-today');
+  const negTitle = document.getElementById('snapshot-negative-title');
+  negCard.classList.remove('is-clear', 'is-alert');
+  if (negativeToday > 0) {
+    negCard.classList.add('is-alert');
+    negCard.querySelector('.snapshot-icon').textContent = '🔴';
+    negTitle.textContent = `Сегодня: ${negativeToday} негативных`;
+  } else {
+    negCard.classList.add('is-clear');
+    negCard.querySelector('.snapshot-icon').textContent = '🟢';
+    negTitle.textContent = 'Сегодня негатива нет';
+  }
+
+  // Последние 7 дней (включая референсную дату) и предыдущие 7 дней (8–14 дней назад)
+  const last7Rows = allRows.filter((row) => row.dateObj && daysBetween(referenceDate, row.dateObj) >= 0 && daysBetween(referenceDate, row.dateObj) <= 6);
+  const prev7Rows = allRows.filter((row) => row.dateObj && daysBetween(referenceDate, row.dateObj) >= 7 && daysBetween(referenceDate, row.dateObj) <= 13);
+
+  const weekStats = computeOverallStats(last7Rows);
+  document.getElementById('snapshot-week-rating').textContent = last7Rows.length ? weekStats.avgRating.toFixed(1) : '—';
+
+  const weekTeam = computeTeamStats(last7Rows).filter((m) => m.count > 0);
+  const weekLeader = weekTeam.length
+    ? weekTeam.slice().sort((a, b) => (b.avg - a.avg) || (b.count - a.count))[0]
+    : null;
+  document.getElementById('snapshot-week-leader').textContent = weekLeader
+    ? `${weekLeader.name} · ${weekLeader.avg.toFixed(1)}`
+    : 'Нет данных';
+
+  const last7Team = computeTeamStats(last7Rows);
+  const prev7Team = computeTeamStats(prev7Rows);
+
+  let worstDrop = null;
+  staffRoster.forEach((name) => {
+    const current = last7Team.find((m) => m.name === name);
+    const previous = prev7Team.find((m) => m.name === name);
+    if (!current || !previous || current.count === 0 || previous.count === 0) return;
+    const drop = previous.avg - current.avg;
+    if (drop > 0.01 && (!worstDrop || drop > worstDrop.drop)) {
+      worstDrop = { name, drop };
+    }
+  });
+
+  const trendCard = document.getElementById('snapshot-trend');
+  const trendIcon = document.getElementById('snapshot-trend-icon');
+  const trendTitle = document.getElementById('snapshot-trend-title');
+  trendCard.classList.remove('is-stable', 'is-alert');
+  if (worstDrop) {
+    trendCard.classList.add('is-alert');
+    trendIcon.textContent = '⚠️';
+    trendTitle.textContent = `Рейтинг ${worstDrop.name} падает`;
+  } else {
+    trendCard.classList.add('is-stable');
+    trendIcon.textContent = '✅';
+    trendTitle.textContent = 'Все работают стабильно';
+  }
+
+  const conversion = MOCK_QR_SCANS > 0 ? (allRows.length / MOCK_QR_SCANS) * 100 : 0;
+  document.getElementById('snapshot-conversion').textContent = `${conversion.toFixed(0)}%`;
+}
+
 /* ---------- Заполнение селекта месяцев ---------- */
 
 function populateMonthSelect() {
   const select = document.getElementById('month-select');
   const previousValue = select.value || 'all';
 
-  const uniqueKeys = new Set(
-    allRows.map((row) => row.monthKey).filter(Boolean)
-  );
-
+  const uniqueKeys = new Set(allRows.map((row) => row.monthKey).filter(Boolean));
   const sortedKeys = Array.from(uniqueKeys).sort();
 
   select.innerHTML = '';
@@ -280,7 +368,7 @@ function populateMonthSelect() {
 
 /* ---------- Рендер: шапка ---------- */
 
-function renderHeaderStats(monthRows, displayRows) {
+function renderHeaderStats(displayRows) {
   const stats = computeOverallStats(displayRows);
   document.getElementById('stat-total-reviews').textContent = String(stats.totalReviews);
   document.getElementById('stat-avg-rating').textContent = stats.avgRating.toFixed(1);
@@ -343,9 +431,7 @@ function renderTeamGrid(monthRows) {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'team-card';
-    if (selectedBarista === member.name) {
-      card.classList.add('active-card');
-    }
+    if (selectedBarista === member.name) card.classList.add('active-card');
 
     const header = document.createElement('div');
     header.className = 'team-card-header';
@@ -412,10 +498,7 @@ function getStaggerDelay(index) {
   const SLOW_STEP = 100;
   const FAST_STEP = 18;
   const SLOW_COUNT = 6;
-
-  if (index < SLOW_COUNT) {
-    return index * SLOW_STEP;
-  }
+  if (index < SLOW_COUNT) return index * SLOW_STEP;
   return SLOW_COUNT * SLOW_STEP + (index - SLOW_COUNT + 1) * FAST_STEP;
 }
 
@@ -441,13 +524,23 @@ function renderReviewsFeed(displayRows) {
     return;
   }
 
-  // displayRows уже отсортированы по свежести на этапе загрузки, порядок сохраняется при фильтрации
   displayRows.forEach((row, index) => {
     const isNegative = row.rating <= 3;
 
     const item = document.createElement('div');
     item.className = 'review-item' + (isNegative ? ' is-negative' : '');
+    item.dataset.rowId = String(row.id);
     item.style.animationDelay = `${getStaggerDelay(index)}ms`;
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'review-delete-btn';
+    deleteBtn.setAttribute('aria-label', 'Удалить отзыв');
+    deleteBtn.textContent = '×';
+    deleteBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      deleteReview(row.id, item);
+    });
 
     const meta = document.createElement('div');
     meta.className = 'review-meta';
@@ -468,6 +561,7 @@ function renderReviewsFeed(displayRows) {
     meta.appendChild(date);
     meta.appendChild(rating);
 
+    item.appendChild(deleteBtn);
     item.appendChild(meta);
 
     if (row.comment) {
@@ -479,6 +573,21 @@ function renderReviewsFeed(displayRows) {
 
     feed.appendChild(item);
   });
+}
+
+/* ---------- Локальная модерация: удаление отзыва ---------- */
+
+function deleteReview(rowId, itemEl) {
+  itemEl.classList.add('is-removing');
+
+  const finish = () => {
+    allRows = allRows.filter((row) => row.id !== rowId);
+    renderDashboard();
+  };
+
+  itemEl.addEventListener('transitionend', finish, { once: true });
+  // Подстраховка на случай, если transitionend не сработает (например, если элемент уже скрыт)
+  setTimeout(finish, 400);
 }
 
 function renderFilterButtons() {
@@ -495,9 +604,10 @@ function renderDashboard() {
   const monthRows = getMonthRows(selectedMonthKey);
   const displayRows = getDisplayRows();
 
+  renderSnapshot();
   renderBestEmployee(monthRows);
   renderTeamGrid(monthRows);
-  renderHeaderStats(monthRows, displayRows);
+  renderHeaderStats(displayRows);
   renderReviewsFeed(displayRows);
   renderFilterButtons();
 }
