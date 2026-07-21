@@ -1,21 +1,22 @@
 const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
+const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=1292898986`;
 
 const monthNames = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
 ];
 
-// Мок-значение сканов QR — пока нет реальной аналитики сканирований,
-// используется как база для карточки конверсии в Executive Snapshot
-const MOCK_QR_SCANS = 140;
-
 const ERROR_MESSAGE = 'Чё-то не работает, обратитесь к Ернару (Муха красавчик).';
 
 // Все загруженные отзывы храним в памяти — фильтруем и удаляем без повторных запросов к сети
 let allRows = [];
 
-// Полный список сотрудников (собирается один раз, чтобы карточки не "прыгали" при смене месяца)
+// Сканы QR со второго листа — каждый скан отдельной строкой: { dateObj, monthKey, barista }
+let allScans = [];
+
+// Полный ростер имён: собирается из сканов (приоритет, т.к. это "источник правды" по бариста)
+// плюс любые имена, которые встретились только в отзывах
 let staffRoster = [];
 
 // Опорная "текущая дата" дашборда — берётся из последней записи, либо 21.07.2026 по умолчанию
@@ -111,7 +112,7 @@ function daysBetween(dateA, dateB) {
   return Math.round((startOfA - startOfB) / MS_PER_DAY);
 }
 
-/* ---------- Железобетонный парсер строк таблицы ---------- */
+/* ---------- Железобетонный парсер отзывов (Лист 1, gid=0) ---------- */
 
 function extractRows(json) {
   const rows = json.table && json.table.rows ? json.table.rows : [];
@@ -149,6 +150,31 @@ function buildRow(rawDate, barista, rating, comment) {
     barista,
     rating,
     comment
+  };
+}
+
+/**
+ * Парсер листа "Бариста и Сканы QR" (Лист 2, gid=1292898986).
+ * Каждая строка — отдельный скан: столбец A — дата, столбец B — имя бариста.
+ */
+function extractScanRows(json) {
+  const rows = json.table && json.table.rows ? json.table.rows : [];
+  return rows
+    .map((row) => {
+      const cells = row.c || [];
+      const rawDate = cells[0] ? (cells[0].f ? cells[0].f : cells[0].v) : null;
+      const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : '';
+      return { date: rawDate, barista };
+    })
+    .filter((scan) => scan.barista);
+}
+
+function buildScanRow(rawDate, barista) {
+  const dateObj = parseDateSafe(rawDate);
+  return {
+    dateObj,
+    monthKey: monthKeyOf(dateObj),
+    barista
   };
 }
 
@@ -199,32 +225,56 @@ function showErrorState() {
   monthSelect.innerHTML = '<option value="all">Все время</option>';
 }
 
-/* ---------- Загрузка данных ---------- */
+/* ---------- Параллельная загрузка обоих листов ---------- */
 
 async function fetchData() {
   hasLoadError = false;
   showLoadingState();
 
   try {
-    const response = await fetch(SHEET_URL);
-    if (!response.ok) throw new Error('Сеть недоступна');
-    const textData = await response.text();
-    const json = parseGvizResponse(textData);
-    const rawRows = extractRows(json);
-    if (!rawRows.length) throw new Error('Таблица пуста');
+    const [reviewsResponse, scansResponse] = await Promise.all([
+      fetch(REVIEWS_URL),
+      fetch(SCANS_URL)
+    ]);
+
+    if (!reviewsResponse.ok || !scansResponse.ok) {
+      throw new Error('Сеть недоступна');
+    }
+
+    const [reviewsText, scansText] = await Promise.all([
+      reviewsResponse.text(),
+      scansResponse.text()
+    ]);
+
+    const reviewsJson = parseGvizResponse(reviewsText);
+    const scansJson = parseGvizResponse(scansText);
+
+    const rawRows = extractRows(reviewsJson);
+    if (!rawRows.length) throw new Error('Таблица отзывов пуста');
+
+    const rawScans = extractScanRows(scansJson);
 
     const builtRows = rawRows.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
     allRows = sortRowsByDateDesc(builtRows);
+    allScans = rawScans.map((scan) => buildScanRow(scan.date, scan.barista));
 
     const datesWithValue = allRows.map((row) => row.dateObj).filter(Boolean);
     referenceDate = datesWithValue.length ? datesWithValue.reduce((a, b) => (a > b ? a : b)) : new Date(2026, 6, 21);
 
-    staffRoster = Array.from(new Set(allRows.map((row) => row.barista))).sort();
+    // Ростер = уникальные имена со второго листа (сканы, приоритетный источник),
+    // плюс любые "лишние" имена, встреченные только в отзывах
+    const scanNames = Array.from(new Set(allScans.map((scan) => scan.barista)));
+    const reviewNames = Array.from(new Set(allRows.map((row) => row.barista)));
+    const extraNames = reviewNames.filter((name) => !scanNames.includes(name));
+    staffRoster = [...scanNames, ...extraNames].sort();
+
     populateMonthSelect();
+    populateBaristaSelectors();
     renderDashboard();
   } catch (error) {
-    console.error('Не удалось загрузить отзывы из Google Sheets.', error);
+    console.error('Не удалось загрузить данные дашборда.', error);
     allRows = [];
+    allScans = [];
     staffRoster = [];
     showErrorState();
   }
@@ -238,11 +288,56 @@ function pluralizeReviews(count) {
   return 'отзывов';
 }
 
+function calcConversion(reviewsCount, scansCount) {
+  if (!scansCount) return 0;
+  return (reviewsCount / scansCount) * 100;
+}
+
+/* ---------- Генерация динамических списков бариста на странице ---------- */
+
+/**
+ * Если на странице есть элементы с data-barista-select (select) или
+ * data-barista-buttons (контейнер для кнопок), заполняет их именами из staffRoster.
+ * Ничего не делает, если таких элементов нет — безопасно для страниц без формы отзыва.
+ */
+function populateBaristaSelectors() {
+  document.querySelectorAll('[data-barista-select]').forEach((select) => {
+    const previousValue = select.value;
+    select.innerHTML = '';
+    staffRoster.forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      select.appendChild(option);
+    });
+    if (staffRoster.includes(previousValue)) {
+      select.value = previousValue;
+    }
+  });
+
+  document.querySelectorAll('[data-barista-buttons]').forEach((container) => {
+    container.innerHTML = '';
+    staffRoster.forEach((name) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'barista-select-btn';
+      btn.textContent = name;
+      btn.dataset.baristaName = name;
+      container.appendChild(btn);
+    });
+  });
+}
+
 /* ---------- Фильтрация по месяцу (глобальная) ---------- */
 
 function getMonthRows(monthKey) {
   if (monthKey === 'all') return allRows;
   return allRows.filter((row) => row.monthKey === monthKey);
+}
+
+function getMonthScans(monthKey) {
+  if (monthKey === 'all') return allScans;
+  return allScans.filter((scan) => scan.monthKey === monthKey);
 }
 
 /* ---------- Комбинированная фильтрация: месяц + сотрудник + негатив ---------- */
@@ -256,21 +351,36 @@ function getDisplayRows() {
   });
 }
 
-function computeTeamStats(rows) {
-  const grouped = {};
-  staffRoster.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
-
-  rows.forEach((row) => {
-    if (!grouped[row.barista]) grouped[row.barista] = { count: 0, total: 0 };
-    grouped[row.barista].count += 1;
-    grouped[row.barista].total += row.rating;
+function computeTeamStats(rows, scans) {
+  const reviewGroups = {};
+  const scanGroups = {};
+  staffRoster.forEach((name) => {
+    reviewGroups[name] = { count: 0, total: 0 };
+    scanGroups[name] = 0;
   });
 
-  return staffRoster.map((name) => ({
-    name,
-    count: grouped[name].count,
-    avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
-  }));
+  rows.forEach((row) => {
+    if (!reviewGroups[row.barista]) reviewGroups[row.barista] = { count: 0, total: 0 };
+    reviewGroups[row.barista].count += 1;
+    reviewGroups[row.barista].total += row.rating;
+  });
+
+  scans.forEach((scan) => {
+    if (scanGroups[scan.barista] === undefined) scanGroups[scan.barista] = 0;
+    scanGroups[scan.barista] += 1;
+  });
+
+  return staffRoster.map((name) => {
+    const count = reviewGroups[name].count;
+    const scansCount = scanGroups[name] || 0;
+    return {
+      name,
+      count,
+      avg: count ? reviewGroups[name].total / count : 0,
+      scans: scansCount,
+      conversion: calcConversion(count, scansCount)
+    };
+  });
 }
 
 function computeOverallStats(rows) {
@@ -288,7 +398,7 @@ function getBestOfTeam(team) {
 
 /* ---------- Executive Snapshot ---------- */
 
-function renderSnapshot() {
+function renderSnapshot(monthRows, monthScans) {
   const todayRows = allRows.filter((row) => row.dateObj && isSameCalendarDay(row.dateObj, referenceDate));
   const negativeToday = todayRows.filter((row) => row.rating <= 3).length;
 
@@ -311,7 +421,10 @@ function renderSnapshot() {
   const weekStats = computeOverallStats(last7Rows);
   document.getElementById('snapshot-week-rating').textContent = last7Rows.length ? weekStats.avgRating.toFixed(1) : '—';
 
-  const weekTeam = computeTeamStats(last7Rows).filter((m) => m.count > 0);
+  const last7Scans = allScans.filter((scan) => scan.dateObj && daysBetween(referenceDate, scan.dateObj) >= 0 && daysBetween(referenceDate, scan.dateObj) <= 6);
+  const prev7Scans = allScans.filter((scan) => scan.dateObj && daysBetween(referenceDate, scan.dateObj) >= 7 && daysBetween(referenceDate, scan.dateObj) <= 13);
+
+  const weekTeam = computeTeamStats(last7Rows, last7Scans).filter((m) => m.count > 0);
   const weekLeader = weekTeam.length
     ? weekTeam.slice().sort((a, b) => (b.avg - a.avg) || (b.count - a.count))[0]
     : null;
@@ -319,8 +432,8 @@ function renderSnapshot() {
     ? `${weekLeader.name} · ${weekLeader.avg.toFixed(1)}`
     : 'Нет данных';
 
-  const last7Team = computeTeamStats(last7Rows);
-  const prev7Team = computeTeamStats(prev7Rows);
+  const last7Team = computeTeamStats(last7Rows, last7Scans);
+  const prev7Team = computeTeamStats(prev7Rows, prev7Scans);
 
   let worstDrop = null;
   staffRoster.forEach((name) => {
@@ -347,8 +460,20 @@ function renderSnapshot() {
     trendTitle.textContent = 'Все работают стабильно';
   }
 
-  const conversion = MOCK_QR_SCANS > 0 ? (allRows.length / MOCK_QR_SCANS) * 100 : 0;
-  document.getElementById('snapshot-conversion').textContent = `${conversion.toFixed(0)}%`;
+  // Конверсия следует за глобальным фильтром месяца, как и остальные виджеты
+  const totalScans = monthScans.length;
+  const totalReviews = monthRows.length;
+  const overallConversion = calcConversion(totalReviews, totalScans);
+  document.getElementById('snapshot-conversion').textContent = `${overallConversion.toFixed(0)}%`;
+
+  const conversionCard = document.getElementById('snapshot-conversion').closest('.snapshot-card');
+  if (conversionCard) {
+    const scopeLabel = selectedMonthKey === 'all' ? 'за всё время' : 'за выбранный месяц';
+    conversionCard.setAttribute(
+      'data-tooltip',
+      `Общая конверсия ${scopeLabel}: отношение всех отзывов (${totalReviews}) к общему числу сканов QR-кодов (${totalScans})`
+    );
+  }
 }
 
 /* ---------- Заполнение селекта месяцев ---------- */
@@ -357,7 +482,11 @@ function populateMonthSelect() {
   const select = document.getElementById('month-select');
   const previousValue = select.value || 'all';
 
-  const uniqueKeys = new Set(allRows.map((row) => row.monthKey).filter(Boolean));
+  const uniqueKeys = new Set([
+    ...allRows.map((row) => row.monthKey),
+    ...allScans.map((scan) => scan.monthKey)
+  ].filter(Boolean));
+
   const sortedKeys = Array.from(uniqueKeys).sort();
 
   select.innerHTML = '';
@@ -408,8 +537,8 @@ function renderHeaderStats(displayRows) {
 
 /* ---------- Рендер: лучший сотрудник (по выбранному месяцу) ---------- */
 
-function renderBestEmployee(monthRows) {
-  const team = computeTeamStats(monthRows);
+function renderBestEmployee(monthRows, monthScans) {
+  const team = computeTeamStats(monthRows, monthScans);
   const best = getBestOfTeam(team);
 
   const nameEl = document.getElementById('best-name');
@@ -427,8 +556,8 @@ function renderBestEmployee(monthRows) {
 
 /* ---------- Рендер: карточки команды (по выбранному месяцу) ---------- */
 
-function renderTeamGrid(monthRows) {
-  const team = computeTeamStats(monthRows);
+function renderTeamGrid(monthRows, monthScans) {
+  const team = computeTeamStats(monthRows, monthScans);
   const grid = document.getElementById('team-grid');
   grid.innerHTML = '';
 
@@ -492,9 +621,15 @@ function renderTeamGrid(monthRows) {
 
     progressTrack.appendChild(progressFill);
 
+    // Персональная строка конверсии QR: Сканов QR: X | Отзывов: Y (Конверсия: Z%)
+    const scansLine = document.createElement('div');
+    scansLine.className = 'team-scans-line';
+    scansLine.textContent = `Сканов QR: ${member.scans} | Отзывов: ${member.count} (Конверсия: ${member.conversion.toFixed(0)}%)`;
+
     card.appendChild(header);
     card.appendChild(scoreRow);
     card.appendChild(progressTrack);
+    card.appendChild(scansLine);
 
     card.addEventListener('click', () => {
       selectedBarista = selectedBarista === member.name ? null : member.name;
@@ -616,11 +751,12 @@ function renderDashboard() {
   if (hasLoadError) return;
 
   const monthRows = getMonthRows(selectedMonthKey);
+  const monthScans = getMonthScans(selectedMonthKey);
   const displayRows = getDisplayRows();
 
-  renderSnapshot();
-  renderBestEmployee(monthRows);
-  renderTeamGrid(monthRows);
+  renderSnapshot(monthRows, monthScans);
+  renderBestEmployee(monthRows, monthScans);
+  renderTeamGrid(monthRows, monthScans);
   renderHeaderStats(displayRows);
   renderReviewsFeed(displayRows);
   renderFilterButtons();
