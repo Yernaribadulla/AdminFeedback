@@ -642,3 +642,9 @@ html, body {
   .snapshot-card[data-tooltip]::before,
   .snapshot-card[data-tooltip]::after { transition: none !important; }
 }
+.team-scans-line {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+}
