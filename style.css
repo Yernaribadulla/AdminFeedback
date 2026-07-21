@@ -13,6 +13,9 @@
   --color-warning-bright: #e2977f;
   --color-warning-dim: rgba(201, 122, 103, 0.14);
 
+  --color-good: #7fae8e;
+  --color-good-dim: rgba(127, 174, 142, 0.14);
+
   --color-text: #f3f3f4;
   --color-text-muted: #8b8b91;
   --color-text-faint: #545458;
@@ -37,7 +40,7 @@ html, body {
   padding: 40px 24px 80px;
   display: flex;
   flex-direction: column;
-  gap: 36px;
+  gap: 32px;
 }
 
 /* ---------- Шапка ---------- */
@@ -101,6 +104,59 @@ html, body {
   height: 36px;
   background: var(--color-line);
 }
+
+/* ---------- Executive Snapshot ---------- */
+
+.snapshot-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.snapshot-card {
+  flex: 1 1 200px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-card);
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.snapshot-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.snapshot-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.snapshot-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.snapshot-caption {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+#snapshot-negative-today.is-clear .snapshot-title { color: var(--color-good); }
+#snapshot-negative-today.is-alert .snapshot-title { color: var(--color-warning-bright); }
+
+#snapshot-trend.is-stable .snapshot-title { color: var(--color-good); }
+#snapshot-trend.is-alert .snapshot-title { color: var(--color-warning-bright); }
 
 /* ---------- Лучший сотрудник ---------- */
 
@@ -391,23 +447,65 @@ html, body {
 }
 
 .review-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
   background: var(--color-card);
   border: 1px solid var(--color-line);
   border-radius: 10px;
-  padding: 18px 20px;
+  padding: 18px 44px 18px 20px;
   opacity: 0;
   transform: translateY(8px);
   animation-name: fogIn;
   animation-duration: 0.5s;
   animation-timing-function: ease;
   animation-fill-mode: forwards;
+  transition: opacity 0.35s ease, transform 0.35s ease, max-height 0.35s ease, padding 0.35s ease, margin 0.35s ease;
 }
 
 .review-item.is-negative {
   border-color: var(--color-warning);
+}
+
+.review-item.is-removing {
+  opacity: 0;
+  transform: translateX(24px);
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.review-delete-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--color-line);
+  background: var(--color-card-alt);
+  color: var(--color-text-faint);
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+
+.review-item:hover .review-delete-btn {
+  opacity: 1;
+}
+
+.review-delete-btn:hover {
+  border-color: var(--color-warning);
+  color: var(--color-warning-bright);
+  background: var(--color-warning-dim);
 }
 
 .review-meta {
@@ -458,11 +556,13 @@ html, body {
 /* ---------- Адаптив ---------- */
 
 @media (max-width: 640px) {
-  .dashboard { padding: 28px 16px 60px; gap: 28px; }
+  .dashboard { padding: 28px 16px 60px; gap: 24px; }
   .dash-header { flex-direction: column; align-items: flex-start; }
   .header-stats { align-self: stretch; justify-content: space-between; }
   .stat-widget { align-items: flex-start; }
   .stat-label { text-align: left; }
+  .snapshot-panel { flex-direction: column; }
+  .snapshot-card { flex: 1 1 auto; }
   .best-employee { flex-direction: column; align-items: stretch; text-align: center; padding: 26px 20px; }
   .month-select-wrap { margin-left: 0; align-items: center; }
   .brand-title { font-size: 26px; }
