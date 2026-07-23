@@ -27,6 +27,7 @@ const fallbackData = [
 
 let allRows = [];
 let totalScansCount = 0;
+let allVisits = [];
 
 let selectedBarista = null;
 let onlyNegative = false;
@@ -204,18 +205,46 @@ async function fetchData() {
 async function loadScansData() {
   try {
     const response = await fetch(SCANS_URL);
-    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
 
     const text = await response.text();
     const json = parseGvizResponse(text);
-    const rows = json.table && json.table.rows ? json.table.rows : [];
 
-    // Считаем только строки, где реально есть данные (защита от пустых хвостов листа)
-    totalScansCount = rows.filter((row) =>
-      row.c && row.c.some((cell) => cell && cell.v !== null && cell.v !== undefined && cell.v !== '')
-    ).length;
+    const rows = json.table?.rows || [];
+
+    allVisits = rows
+      .map((row) => {
+        if (!row.c) return null;
+
+        const rawDate = row.c[0]?.v || row.c[0]?.f;
+        const rawBarista = row.c[1]?.v || row.c[1]?.f;
+
+        if (!rawDate || !rawBarista) return null;
+
+        const dateObj = parseDateSafe(rawDate);
+
+        if (!dateObj) return null;
+
+        return {
+          dateObj,
+          monthKey: `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`,
+          barista: String(rawBarista).trim().toLowerCase()
+        };
+      })
+      .filter(Boolean);
+
+    totalScansCount = allVisits.length;
+
+    console.log("Visits:", allVisits);
+    console.log("Всего сканов:", totalScansCount);
+
   } catch (err) {
-    console.warn('⚠️ Не удалось загрузить сканы с листа Visits:', err);
+    console.error("Ошибка загрузки Visits:", err);
+
+    allVisits = [];
     totalScansCount = 0;
   }
 }
@@ -456,17 +485,14 @@ function renderBestEmployee(monthRows) {
 
 /* ---------- Рендер: карточки команды (по выбранному месяцу) ---------- */
 
-function computeStats(monthRows) {
-  const totalReviews = monthRows.length;
-  const avgRating = totalReviews
-    ? monthRows.reduce((sum, r) => sum + r.rating, 0) / totalReviews
-    : 0;
-
   // 1. Считаем сканы для каждого баристы за фильтруемый период
   // (берем из allVisits, отфильтрованного по текущему месяцу, если он есть)
-  const currentMonthVisits = typeof allVisits !== 'undefined' ? allVisits.filter(visit => {
-    return selectedMonth === 'all' || !selectedMonth || visit.month === selectedMonth;
-  }) : [];
+  const currentMonthVisits = allVisits.filter((visit) => {
+  return (
+    selectedMonthKey === "all" ||
+    visit.monthKey === selectedMonthKey
+  );
+});
 
   const visitsGrouped = {};
   currentMonthVisits.forEach(v => {
@@ -493,7 +519,7 @@ function computeStats(monthRows) {
     .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
 
   return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
-}
+
 
 function pluralizeScans(n) {
   if (n % 10 === 1 && n % 100 !== 11) return 'скан';
