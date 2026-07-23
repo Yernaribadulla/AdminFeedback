@@ -271,27 +271,54 @@ function computeStats(rows) {
   const totalScore = rows.reduce((sum, row) => sum + (Number(row.rating) || 0), 0);
   const avgRating = totalReviews ? totalScore / totalReviews : 0;
 
-  const staffNames = new Set(rows.map((row) => row.barista));
   const grouped = {};
-  staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
 
   rows.forEach((row) => {
-    if (grouped[row.barista]) {
-      grouped[row.barista].count += 1;
-      grouped[row.barista].total += (Number(row.rating) || 0);
+    const key = row.barista.trim().toLowerCase();
+
+    if (!grouped[key]) {
+      grouped[key] = {
+        name: row.barista,
+        count: 0,
+        total: 0,
+        scans: 0
+      };
+    }
+
+    grouped[key].count++;
+    grouped[key].total += Number(row.rating) || 0;
+  });
+
+  const currentMonthVisits = allVisits.filter((visit) => {
+    return (
+      selectedMonthKey === "all" ||
+      visit.monthKey === selectedMonthKey
+    );
+  });
+
+  currentMonthVisits.forEach((visit) => {
+    const key = visit.barista.trim().toLowerCase();
+
+    if (grouped[key]) {
+      grouped[key].scans++;
     }
   });
 
-  const team = Array.from(staffNames)
-    .map((name) => ({
-      name,
-      count: grouped[name].count,
-      avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
+  const team = Object.values(grouped)
+    .map((member) => ({
+      name: member.name,
+      count: member.count,
+      scans: member.scans,
+      avg: member.count ? member.total / member.count : 0
     }))
-    .filter((member) => member.count > 0)
     .sort((a, b) => b.avg - a.avg);
 
-  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
+  return {
+    totalReviews,
+    avgRating,
+    team,
+    best: team.length ? team[0] : null
+  };
 }
 
 /* ---------- Фильтрация: месяц + бариста + негатив ---------- */
