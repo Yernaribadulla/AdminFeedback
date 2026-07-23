@@ -516,58 +516,17 @@ html, body {
   background: var(--color-card);
   border: 1px solid var(--color-line);
   border-radius: 10px;
-  padding: 18px 44px 18px 20px;
+  padding: 18px 20px;
   opacity: 0;
   transform: translateY(8px);
   animation-name: fogIn;
   animation-duration: 0.5s;
   animation-timing-function: ease;
   animation-fill-mode: forwards;
-  transition: opacity 0.35s ease, transform 0.35s ease, max-height 0.35s ease, padding 0.35s ease, margin 0.35s ease;
 }
 
 .review-item.is-negative {
   border-color: var(--color-warning);
-}
-
-.review-item.is-removing {
-  opacity: 0;
-  transform: translateX(24px);
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin: 0;
-  overflow: hidden;
-}
-
-.review-delete-btn {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 1px solid var(--color-line);
-  background: var(--color-card-alt);
-  color: var(--color-text-faint);
-  font-size: 14px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease, border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
-}
-
-.review-item:hover .review-delete-btn {
-  opacity: 1;
-}
-
-.review-delete-btn:hover {
-  border-color: var(--color-warning);
-  color: var(--color-warning-bright);
-  background: var(--color-warning-dim);
 }
 
 .review-meta {
@@ -641,10 +600,4 @@ html, body {
   .review-item { animation: none !important; opacity: 1 !important; transform: none !important; }
   .snapshot-card[data-tooltip]::before,
   .snapshot-card[data-tooltip]::after { transition: none !important; }
-}
-.team-scans-line {
-  margin-top: 10px;
-  font-size: 11px;
-  color: var(--color-text-faint);
-  font-family: var(--font-mono);
 }
