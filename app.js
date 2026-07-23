@@ -66,14 +66,16 @@ function buildRow(rawDate, barista, rating, comment) {
   const year = dateObj.getFullYear();
   const month = dateObj.getMonth() + 1;
   
-  // Парсим рейтинг, превращая строки с запятыми в чистые числа
-  let numRating = 0;
-  if (typeof rating === 'number') {
-    numRating = rating;
-  } else if (rating !== null && rating !== undefined) {
-    const cleanStr = String(rating).replace(',', '.').replace(/[^\d.]/g, '');
-    numRating = parseFloat(cleanStr) || 0;
+  let numRating = Number(rating) || 0;
+
+  // Если из-за кривого формата Google всё равно отдал 55 вместо 5 или 25 вместо 2.5
+  if (numRating > 5) {
+    numRating = numRating / 10;
   }
+
+  // Жесткий лимит от 1 до 5
+  if (numRating > 5) numRating = 5;
+  if (numRating < 0) numRating = 0;
 
   return {
     dateObj,
@@ -92,13 +94,26 @@ function extractRows(json) {
     .map((row) => {
       if (!row.c) return null;
       const cells = row.c;
-      const rawDate = cells[0] ? (cells[0].f || cells[0].v) : null;
-      const barista = cells[1] && cells[1].v ? cells[1].v : '';
-      const rating = cells[2] ? (cells[2].v !== null ? cells[2].v : cells[2].f) : 0;
-      const comment = cells[3] && cells[3].v ? cells[3].v : '';
+      
+      const rawDate = cells[0] ? (cells[0].v || cells[0].f) : null;
+      const barista = cells[1] && cells[1].v !== null ? cells[1].v : '';
+      
+      // БЕРЕМ ИСКЛЮЧИТЕЛЬНО .v (значение-число), а не .f (форматированный текст)
+      let rawRating = 0;
+      if (cells[2]) {
+        if (typeof cells[2].v === 'number') {
+          rawRating = cells[2].v;
+        } else if (cells[2].v !== null && cells[2].v !== undefined) {
+          rawRating = parseFloat(String(cells[2].v).replace(',', '.')) || 0;
+        } else if (cells[2].f) {
+          rawRating = parseFloat(String(cells[2].f).replace(',', '.')) || 0;
+        }
+      }
+
+      const comment = cells[3] && cells[3].v !== null ? cells[3].v : '';
 
       if (!barista) return null;
-      return buildRow(rawDate, barista, rating, comment);
+      return buildRow(rawDate, barista, rawRating, comment);
     })
     .filter((r) => r !== null && r.rating > 0);
 }
