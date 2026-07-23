@@ -255,6 +255,11 @@ function pluralizeReviews(count) {
   if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'отзыва';
   return 'отзывов';
 }
+function pluralizeScans(n) {
+  if (n % 10 === 1 && n % 100 !== 11) return 'скан';
+  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'скана';
+  return 'сканов';
+}
 
 function daysBetween(dateA, dateB) {
   const MS_PER_DAY = 24 * 60 * 60 * 1000;
