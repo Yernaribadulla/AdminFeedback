@@ -514,38 +514,7 @@ function renderBestEmployee(monthRows) {
 
   // 1. Считаем сканы для каждого баристы за фильтруемый период
   // (берем из allVisits, отфильтрованного по текущему месяцу, если он есть)
-  const currentMonthVisits = allVisits.filter((visit) => {
-  return (
-    selectedMonthKey === "all" ||
-    visit.monthKey === selectedMonthKey
-  );
-});
 
-  const visitsGrouped = {};
-  currentMonthVisits.forEach(v => {
-    const name = (v.barista || '').trim().toLowerCase();
-    if (name) {
-      visitsGrouped[name] = (visitsGrouped[name] || 0) + 1;
-    }
-  });
-
-  const team = Array.from(staffNames)
-    .map((name) => {
-      const reviewCount = grouped[name] ? grouped[name].count : 0;
-      const reviewTotal = grouped[name] ? grouped[name].total : 0;
-      const scanCount = visitsGrouped[name.toLowerCase()] || 0;
-
-      return {
-        name,
-        count: reviewCount,
-        scans: scanCount,
-        avg: reviewCount ? reviewTotal / reviewCount : 0
-      };
-    })
-    .filter((member) => member.count > 0 || member.scans > 0) // Показываем тех, у кого есть либо отзывы, либо сканы
-    .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
-
-  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
 
 
 function pluralizeScans(n) {
