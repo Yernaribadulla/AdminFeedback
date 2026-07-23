@@ -538,6 +538,47 @@ function computeStats(monthRows) {
 
   return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
 }
+
+function pluralizeScans(n) {
+  if (n % 10 === 1 && n % 100 !== 11) return 'скан';
+  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'скана';
+  return 'сканов';
+}
+
+function renderTeamGrid(monthRows) {
+  const stats = computeStats(monthRows);
+  const grid = document.getElementById('team-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  stats.team.forEach((member) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'team-card' + (selectedBarista === member.name ? ' active-card' : '');
+    card.onclick = () => selectBarista(member.name);
+
+    card.innerHTML = `
+      <div class="team-card-header">
+        <div class="team-avatar">${member.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="team-name">${member.name}</div>
+          <div class="team-count">
+            ${member.count} ${pluralizeReviews(member.count)} · ${member.scans} ${pluralizeScans(member.scans)}
+          </div>
+        </div>
+      </div>
+      <div class="team-score-row">
+        <span class="team-score-value">${member.avg ? member.avg.toFixed(1) : '0.0'}</span>
+        <span class="team-score-max">из 5.0</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width: ${Math.min((member.avg / 5) * 100, 100)}%"></div>
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+}
 /* ---------- Рендер: лента отзывов ---------- */
 
 function renderReviewsFeed(displayRows) {
