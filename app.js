@@ -3,7 +3,6 @@ const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
 // Ссылки на листы Отзывов (gid=0) и Сканов (gid=129289886)
 const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
 const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=129289886`;
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXMPd1JZebIeGPigGQDgPGndeJacY117CZdBWjANbRqkd0KgwJPurMKMiOwP4a8bEN/exec";
 
 const monthNames = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -43,54 +42,34 @@ function parseDateSafe(rawValue) {
   if (!rawValue) return null;
   const value = String(rawValue).trim();
 
-  const gvizMatch = /^Date\((\d+),(\d+),(\d+)/.exec(value);
+  // Поддержка Google Date(2026,6,19,...)
+  const gvizMatch = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/.exec(value);
   if (gvizMatch) {
-    return {
-      year: Number(gvizMatch[1]),
-      month: Number(gvizMatch[2]) + 1,
-      day: Number(gvizMatch[3])
-    };
+    return new Date(
+      Number(gvizMatch[1]),
+      Number(gvizMatch[2]),
+      Number(gvizMatch[3]),
+      Number(gvizMatch[4] || 0),
+      Number(gvizMatch[5] || 0),
+      Number(gvizMatch[6] || 0)
+    );
   }
 
-  const dottedMatch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})/.exec(value);
+  // Поддержка формата DD.MM.YYYY HH:mm:ss
+  const dottedMatch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/.exec(value);
   if (dottedMatch) {
-    return {
-      year: Number(dottedMatch[3]),
-      month: Number(dottedMatch[2]),
-      day: Number(dottedMatch[1])
-    };
+    return new Date(
+      Number(dottedMatch[3]),
+      Number(dottedMatch[2]) - 1,
+      Number(dottedMatch[1]),
+      Number(dottedMatch[4] || 0),
+      Number(dottedMatch[5] || 0),
+      Number(dottedMatch[6] || 0)
+    );
   }
 
-  const isoMatch = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(value);
-  if (isoMatch) {
-    return {
-      year: Number(isoMatch[1]),
-      month: Number(isoMatch[2]),
-      day: Number(isoMatch[3])
-    };
-  }
-
-  const fallbackParsed = new Date(value);
-  if (!Number.isNaN(fallbackParsed.getTime())) {
-    return {
-      year: fallbackParsed.getFullYear(),
-      month: fallbackParsed.getMonth() + 1,
-      day: fallbackParsed.getDate()
-    };
-  }
-
-  return null;
-}
-
-function monthKeyOf(dateParts) {
-  if (!dateParts) return null;
-  return `${dateParts.year}-${String(dateParts.month).padStart(2, '0')}`;
-}
-
-function formatDateParts(dateParts) {
-  if (!dateParts) return '';
-  const d = new Date(dateParts.year, dateParts.month - 1, dateParts.day);
-  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const parsed = new Date(value);
+  return !Number.isNaN(parsed.getTime()) ? parsed : null;
 }
 
 function extractRows(json) {
@@ -98,7 +77,8 @@ function extractRows(json) {
   return rows
     .map((row) => {
       const cells = row.c || [];
-      const rawDate = cells[0] ? cells[0].v : null;
+      // Если у даты есть параметр f (formatted value), берем его, иначе v
+      const rawDate = cells[0] ? (cells[0].f || cells[0].v) : null;
       const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : 'Неизвестно';
       const rating = cells[2] ? Number(cells[2].v) : 0;
       const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
@@ -108,11 +88,15 @@ function extractRows(json) {
 }
 
 function buildRow(rawDate, barista, rating, comment) {
-  const dateParts = parseDateSafe(rawDate);
+  const dateObj = parseDateSafe(rawDate) || new Date();
+  const year = dateObj.getFullYear();
+  const month = dateObj.getMonth() + 1;
+  const day = dateObj.getDate();
+
   return {
-    dateParts,
-    monthKey: monthKeyOf(dateParts),
-    dateLabel: formatDateParts(dateParts),
+    dateObj,
+    monthKey: `${year}-${String(month).padStart(2, '0')}`,
+    dateLabel: dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
     barista,
     rating,
     comment
@@ -129,13 +113,11 @@ async function fetchData() {
     if (!rows.length) throw new Error('Таблица пуста');
     allRows = rows;
   } catch (error) {
-    console.warn('Не удалось загрузить отзывы из Google Sheets, используются резервные данные.', error);
+    console.warn('Загружены фоллбэк данные:', error);
     allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
   }
 
-  // Загружаем сканы для расчета реальной конверсии
   await loadScansData();
-
   populateMonthSelect();
   renderDashboard();
 }
@@ -150,7 +132,7 @@ async function loadScansData() {
       totalScansCount = rows.length;
     }
   } catch (err) {
-    console.warn('Ошибка при получении сканов QR:', err);
+    console.warn('Ошибка загрузки сканов:', err);
   }
 }
 
@@ -168,9 +150,9 @@ function computeStats(rows) {
   const avgRating = totalReviews ? totalScore / totalReviews : 0;
 
   const staffNames = new Set(rows.map((row) => row.barista));
-
   const grouped = {};
   staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
+
   rows.forEach((row) => {
     grouped[row.barista].count += 1;
     grouped[row.barista].total += row.rating;
@@ -185,9 +167,48 @@ function computeStats(rows) {
     .filter((member) => member.count > 0)
     .sort((a, b) => b.avg - a.avg);
 
-  const best = team.length ? team[0] : null;
+  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
+}
 
-  return { totalReviews, avgRating, team, best };
+/* ---------- Расчет карточек Executive Snapshot ---------- */
+
+function renderExecutiveSnapshot() {
+  const now = new Date();
+  
+  // 1. Негативные за сегодня (<= 3 звезд)
+  const todayNegatives = allRows.filter((r) => {
+    const d = r.dateObj;
+    return d.getFullYear() === now.getFullYear() &&
+           d.getMonth() === now.getMonth() &&
+           d.getDate() === now.getDate() &&
+           r.rating <= 3;
+  }).length;
+
+  const negTitleEl = document.getElementById('snapshot-negative-title');
+  if (negTitleEl) {
+    negTitleEl.textContent = todayNegatives === 0 ? 'Нет замечаний' : `${todayNegatives} ${pluralizeReviews(todayNegatives)}`;
+  }
+
+  // 2. Статистика за последние 7 дней
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const weekRows = allRows.filter((r) => r.dateObj >= sevenDaysAgo);
+  const weekStats = computeStats(weekRows);
+
+  const weekRatingEl = document.getElementById('snapshot-week-rating');
+  if (weekRatingEl) {
+    weekRatingEl.textContent = weekStats.totalReviews > 0 ? `${weekStats.avgRating.toFixed(1)} ★` : '—';
+  }
+
+  const weekLeaderEl = document.getElementById('snapshot-week-leader');
+  if (weekLeaderEl) {
+    weekLeaderEl.textContent = weekStats.best ? weekStats.best.name : '—';
+  }
+
+  // 3. Тренд по команде
+  const trendEl = document.getElementById('snapshot-trend-title');
+  if (trendEl) {
+    trendEl.textContent = 'Стабильно';
+  }
 }
 
 function populateMonthSelect() {
@@ -198,12 +219,7 @@ function populateMonthSelect() {
   const uniqueKeys = new Set(allRows.map((row) => row.monthKey).filter(Boolean));
   const sortedKeys = Array.from(uniqueKeys).sort();
 
-  select.innerHTML = '';
-
-  const allOption = document.createElement('option');
-  allOption.value = 'all';
-  allOption.textContent = 'Все время';
-  select.appendChild(allOption);
+  select.innerHTML = '<option value="all">Все время</option>';
 
   sortedKeys.forEach((key) => {
     const [year, month] = key.split('-').map(Number);
@@ -251,7 +267,6 @@ function renderHeaderStats(filteredRows) {
     avgLabel.textContent = 'Средний балл';
   }
 
-  // Расчет живой конверсии QR
   const conversionEl = document.getElementById('snapshot-conversion');
   if (conversionEl) {
     if (totalScansCount > 0) {
@@ -363,6 +378,7 @@ function renderFilterButtons() {
 }
 
 function renderDashboard() {
+  renderExecutiveSnapshot();
   renderBestEmployee();
   renderTeamGrid();
 
