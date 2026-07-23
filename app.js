@@ -3,13 +3,12 @@ const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
 const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
 const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=129289886`;
 
-// Локальный фоллбэк на случай полного пиздеца с сетью или Гуглом
 const fallbackData = [
-  { date: '2026-07-20', barista: 'Диас', rating: 5, comment: 'Отличный кофе и сервис!' },
-  { date: '2026-07-21', barista: 'Ислам', rating: 4, comment: 'Всё круто, но долго делали' },
-  { date: '2026-07-22', barista: 'Баха', rating: 5, comment: 'Лучший раф в городе' },
-  { date: '2026-07-22', barista: 'Диас', rating: 4, comment: 'Хорошая атмосфера' },
-  { date: '2026-07-23', barista: 'Диас', rating: 5, comment: 'Супер!' }
+  { date: '2026-07-20', barista: 'dias', rating: 5, comment: 'Отличный кофе и сервис!' },
+  { date: '2026-07-21', barista: 'islam', rating: 4, comment: 'Всё круто, но долго делали' },
+  { date: '2026-07-22', barista: 'baha', rating: 5, comment: 'Лучший раф в городе' },
+  { date: '2026-07-22', barista: 'dias', rating: 2, comment: 'Холодный кофе' },
+  { date: '2026-07-23', barista: 'dias', rating: 5, comment: 'Супер!' }
 ];
 
 const monthNames = [
@@ -18,7 +17,7 @@ const monthNames = [
 ];
 
 let allRows = [];
-let totalScansCount = 10;
+let totalScansCount = 0;
 
 let selectedBarista = null;
 let onlyNegative = false;
@@ -26,9 +25,7 @@ let selectedMonthKey = 'all';
 
 function parseGvizResponse(text) {
   const match = text.match(/setResponse\(([\s\S]*)\);?\s*$/);
-  if (!match) {
-    throw new Error('CORS или структура ответа Google Таблицы некорректна');
-  }
+  if (!match) throw new Error('Некорректный ответ Google Sheets');
   return JSON.parse(match[1]);
 }
 
@@ -68,14 +65,23 @@ function buildRow(rawDate, barista, rating, comment) {
   const dateObj = parseDateSafe(rawDate);
   const year = dateObj.getFullYear();
   const month = dateObj.getMonth() + 1;
+  
+  // Парсим рейтинг, превращая строки с запятыми в чистые числа
+  let numRating = 0;
+  if (typeof rating === 'number') {
+    numRating = rating;
+  } else if (rating !== null && rating !== undefined) {
+    const cleanStr = String(rating).replace(',', '.').replace(/[^\d.]/g, '');
+    numRating = parseFloat(cleanStr) || 0;
+  }
 
   return {
     dateObj,
     monthKey: `${year}-${String(month).padStart(2, '0')}`,
     dateLabel: dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
-    barista,
-    rating,
-    comment
+    barista: String(barista).trim(),
+    rating: numRating,
+    comment: String(comment || '')
   };
 }
 
@@ -87,14 +93,14 @@ function extractRows(json) {
       if (!row.c) return null;
       const cells = row.c;
       const rawDate = cells[0] ? (cells[0].f || cells[0].v) : null;
-      const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : '';
-      const rating = cells[2] && cells[2].v !== null ? Number(cells[2].v) : 0;
-      const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
+      const barista = cells[1] && cells[1].v ? cells[1].v : '';
+      const rating = cells[2] ? (cells[2].v !== null ? cells[2].v : cells[2].f) : 0;
+      const comment = cells[3] && cells[3].v ? cells[3].v : '';
 
-      if (!barista || rating === 0) return null;
+      if (!barista) return null;
       return buildRow(rawDate, barista, rating, comment);
     })
-    .filter(Boolean);
+    .filter((r) => r !== null && r.rating > 0);
 }
 
 async function fetchData() {
@@ -102,11 +108,10 @@ async function fetchData() {
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(REVIEWS_URL)}`;
 
   try {
-    console.log('🔄 Отправка запроса в Google Sheets...');
+    console.log('🔄 Загрузка данных...');
     let response = await fetch(directUrl);
     
     if (!response.ok) {
-      console.warn('Прямой запрос не прошел, пробуем через прокси...');
       response = await fetch(proxyUrl);
     }
 
@@ -118,10 +123,10 @@ async function fetchData() {
 
     if (!rows.length) throw new Error('Таблица пуста');
 
-    console.log('✅ Данные успешно загружены из таблицы:', rows);
+    console.log('✅ Загружено отзывов:', rows.length, rows);
     allRows = rows;
   } catch (error) {
-    console.error('❌ Ошибка загрузки из Гугл Таблицы (включаем фоллбэк):', error);
+    console.error('❌ Ошибка загрузки, включаем фоллбэк:', error);
     allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
   }
 
@@ -137,7 +142,7 @@ async function loadScansData() {
       const text = await response.text();
       const json = parseGvizResponse(text);
       const rows = json.table && json.table.rows ? json.table.rows : [];
-      if (rows.length > 0) totalScansCount = rows.length;
+      totalScansCount = rows.length;
     }
   } catch (err) {
     console.warn(' Ошибка загрузки сканов:', err);
@@ -154,7 +159,7 @@ function pluralizeReviews(count) {
 
 function computeStats(rows) {
   const totalReviews = rows.length;
-  const totalScore = rows.reduce((sum, row) => sum + row.rating, 0);
+  const totalScore = rows.reduce((sum, row) => sum + (Number(row.rating) || 0), 0);
   const avgRating = totalReviews ? totalScore / totalReviews : 0;
 
   const staffNames = new Set(rows.map((row) => row.barista));
@@ -162,8 +167,10 @@ function computeStats(rows) {
   staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
 
   rows.forEach((row) => {
-    grouped[row.barista].count += 1;
-    grouped[row.barista].total += row.rating;
+    if (grouped[row.barista]) {
+      grouped[row.barista].count += 1;
+      grouped[row.barista].total += (Number(row.rating) || 0);
+    }
   });
 
   const team = Array.from(staffNames)
@@ -223,7 +230,7 @@ function populateMonthSelect() {
   const select = document.getElementById('month-select');
   if (!select) return;
 
-  const previousValue = select.value || 'all';
+  const previousValue = selectedMonthKey;
   const uniqueKeys = new Set(allRows.map((row) => row.monthKey).filter(Boolean));
   const sortedKeys = Array.from(uniqueKeys).sort();
 
@@ -237,21 +244,18 @@ function populateMonthSelect() {
     select.appendChild(option);
   });
 
-  select.value = sortedKeys.includes(previousValue) || previousValue === 'all' ? previousValue : 'all';
+  select.value = sortedKeys.includes(previousValue) ? previousValue : 'all';
   selectedMonthKey = select.value;
 }
 
+// Выборка по Месяцу + Баристе + Негативу
 function getDisplayRows() {
   return allRows.filter((row) => {
+    if (selectedMonthKey !== 'all' && row.monthKey !== selectedMonthKey) return false;
     if (selectedBarista && row.barista !== selectedBarista) return false;
     if (onlyNegative && row.rating > 3) return false;
     return true;
   });
-}
-
-function getMonthRows(monthKey) {
-  if (monthKey === 'all') return allRows;
-  return allRows.filter((row) => row.monthKey === monthKey);
 }
 
 function renderHeaderStats(filteredRows) {
@@ -260,18 +264,7 @@ function renderHeaderStats(filteredRows) {
   const avgEl = document.getElementById('stat-avg-rating');
   
   if (totalEl) totalEl.textContent = String(stats.totalReviews);
-  if (avgEl) avgEl.textContent = stats.avgRating.toFixed(1);
-
-  const totalLabel = document.getElementById('stat-total-label');
-  const avgLabel = document.getElementById('stat-avg-label');
-
-  const scopeParts = [];
-  if (selectedBarista) scopeParts.push(selectedBarista);
-  if (onlyNegative) scopeParts.push('негативные');
-  const scopeSuffix = scopeParts.length ? ` · ${scopeParts.join(', ')}` : '';
-
-  if (totalLabel) totalLabel.textContent = selectedBarista || onlyNegative ? `Отзывов${scopeSuffix}` : 'Всего отзывов';
-  if (avgLabel) avgLabel.textContent = selectedBarista || onlyNegative ? `Средний балл${scopeSuffix}` : 'Средний балл';
+  if (avgEl) avgEl.textContent = stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '0.0';
 
   const conversionEl = document.getElementById('snapshot-conversion');
   if (conversionEl) {
@@ -279,14 +272,13 @@ function renderHeaderStats(filteredRows) {
       const rate = ((allRows.length / totalScansCount) * 100).toFixed(1);
       conversionEl.textContent = `${rate}%`;
     } else {
-      conversionEl.textContent = '0%';
+      conversionEl.textContent = '100.0%';
     }
   }
 }
 
-function renderBestEmployee() {
-  const monthRows = getMonthRows(selectedMonthKey);
-  const stats = computeStats(monthRows);
+function renderBestEmployee(periodRows) {
+  const stats = computeStats(periodRows);
 
   const nameEl = document.getElementById('best-name');
   const scoreEl = document.getElementById('best-score');
@@ -303,14 +295,14 @@ function renderBestEmployee() {
   if (scoreEl) scoreEl.textContent = `${stats.best.avg.toFixed(1)} из 5 · ${stats.best.count} ${pluralizeReviews(stats.best.count)}`;
 }
 
-function renderTeamGrid() {
-  const stats = computeStats(allRows);
+function renderTeamGrid(periodRows) {
+  const stats = computeStats(periodRows);
   const grid = document.getElementById('team-grid');
   if (!grid) return;
   grid.innerHTML = '';
 
   if (!stats.team.length) {
-    grid.innerHTML = '<div class="state-placeholder">Нет данных по команде</div>';
+    grid.innerHTML = '<div class="state-placeholder">Нет данных по команде за этот период</div>';
     return;
   }
 
@@ -372,7 +364,7 @@ function renderReviewsFeed(filteredRows) {
       <div class="review-meta">
         <span class="review-barista">${row.barista}</span>
         <span class="review-date">${row.dateLabel}</span>
-        <span class="review-rating ${isNegative ? 'is-negative' : ''}">${row.rating} ★</span>
+        <span class="review-rating ${isNegative ? 'is-negative' : ''}">${row.rating.toFixed(1)} ★</span>
       </div>
       ${row.comment ? `<p class="review-comment">${row.comment}</p>` : ''}
     `;
@@ -386,14 +378,29 @@ function renderFilterButtons() {
   if (resetBtn) resetBtn.classList.toggle('is-disabled', selectedBarista === null);
 
   const negativeBtn = document.getElementById('negative-filter-btn');
-  if (negativeBtn) negativeBtn.classList.toggle('is-active', onlyNegative);
+  if (negativeBtn) {
+    if (onlyNegative) {
+      negativeBtn.style.background = '#e74c3c';
+      negativeBtn.style.color = '#fff';
+    } else {
+      negativeBtn.style.background = '';
+      negativeBtn.style.color = '';
+    }
+  }
 }
 
 function renderDashboard() {
   renderExecutiveSnapshot();
-  renderBestEmployee();
-  renderTeamGrid();
 
+  // Получаем строки для текущего выбранного Месяца
+  const periodRows = selectedMonthKey === 'all' 
+    ? allRows 
+    : allRows.filter((r) => r.monthKey === selectedMonthKey);
+
+  renderBestEmployee(periodRows);
+  renderTeamGrid(periodRows);
+
+  // Итоговый отфильтрованный массив (с учетом периода, баристы и негатива)
   const filteredRows = getDisplayRows();
   renderHeaderStats(filteredRows);
   renderReviewsFeed(filteredRows);
@@ -421,7 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (monthSelect) {
     monthSelect.addEventListener('change', (event) => {
       selectedMonthKey = event.target.value;
-      renderBestEmployee();
+      renderDashboard();
     });
   }
 
