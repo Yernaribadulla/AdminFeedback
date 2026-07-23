@@ -237,61 +237,34 @@ function daysBetween(dateA, dateB) {
 
 /* ---------- Расчёт статистики ---------- */
 
-function computeStats(monthRows) {
-  const totalReviews = monthRows.length;
-  const avgRating = totalReviews
-    ? monthRows.reduce((sum, r) => sum + r.rating, 0) / totalReviews
-    : 0;
+function computeStats(rows) {
+  const totalReviews = rows.length;
+  const totalScore = rows.reduce((sum, row) => sum + (Number(row.rating) || 0), 0);
+  const avgRating = totalReviews ? totalScore / totalReviews : 0;
 
-  // 1. Считаем сканы за период
-  const currentMonthVisits = typeof allVisits !== 'undefined' ? allVisits.filter(visit => {
-    return selectedMonth === 'all' || !selectedMonth || visit.month === selectedMonth;
-  }) : [];
-
-  const visitsGrouped = {};
-  currentMonthVisits.forEach(v => {
-    const name = (v.barista || '').trim().toLowerCase();
-    if (name) {
-      visitsGrouped[name] = (visitsGrouped[name] || 0) + 1;
-    }
-  });
-
-  // 2. Группируем отзывы по именам барист из текущего месяца
+  const staffNames = new Set(rows.map((row) => row.barista));
   const grouped = {};
-  monthRows.forEach(r => {
-    const name = (r.barista || '').trim();
-    if (!name) return;
-    if (!grouped[name]) {
-      grouped[name] = { count: 0, total: 0 };
+  staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
+
+  rows.forEach((row) => {
+    if (grouped[row.barista]) {
+      grouped[row.barista].count += 1;
+      grouped[row.barista].total += (Number(row.rating) || 0);
     }
-    grouped[name].count += 1;
-    grouped[name].total += r.rating;
   });
 
-  // 3. Собираем единый список всех имён (и из отзывов, и из сканов)
-  const allNames = new Set([
-    ...Object.keys(grouped),
-    ...Object.keys(visitsGrouped).map(n => n.charAt(0).toUpperCase() + n.slice(1))
-  ]);
-
-  const team = Array.from(allNames)
-    .map((name) => {
-      const reviewCount = grouped[name] ? grouped[name].count : 0;
-      const reviewTotal = grouped[name] ? grouped[name].total : 0;
-      const scanCount = visitsGrouped[name.toLowerCase()] || 0;
-
-      return {
-        name,
-        count: reviewCount,
-        scans: scanCount,
-        avg: reviewCount ? reviewTotal / reviewCount : 0
-      };
-    })
-    .filter((member) => member.count > 0 || member.scans > 0)
-    .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
+  const team = Array.from(staffNames)
+    .map((name) => ({
+      name,
+      count: grouped[name].count,
+      avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
+    }))
+    .filter((member) => member.count > 0)
+    .sort((a, b) => b.avg - a.avg);
 
   return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
 }
+
 /* ---------- Фильтрация: месяц + бариста + негатив ---------- */
 
 // Строки только с учётом выбранного месяца — база для команды/лучшего сотрудника/недели
@@ -489,7 +462,8 @@ function computeStats(monthRows) {
     ? monthRows.reduce((sum, r) => sum + r.rating, 0) / totalReviews
     : 0;
 
-  // 1. Считаем сканы за период
+  // 1. Считаем сканы для каждого баристы за фильтруемый период
+  // (берем из allVisits, отфильтрованного по текущему месяцу, если он есть)
   const currentMonthVisits = typeof allVisits !== 'undefined' ? allVisits.filter(visit => {
     return selectedMonth === 'all' || !selectedMonth || visit.month === selectedMonth;
   }) : [];
@@ -502,25 +476,7 @@ function computeStats(monthRows) {
     }
   });
 
-  // 2. Группируем отзывы по именам барист
-  const grouped = {};
-  monthRows.forEach(r => {
-    const name = (r.barista || '').trim();
-    if (!name) return;
-    if (!grouped[name]) {
-      grouped[name] = { count: 0, total: 0 };
-    }
-    grouped[name].count += 1;
-    grouped[name].total += r.rating;
-  });
-
-  // 3. Формируем список всех сотрудников из отзывов и сканов
-  const uniqueNames = new Set([
-    ...Object.keys(grouped),
-    ...Object.keys(visitsGrouped).map(n => n.charAt(0).toUpperCase() + n.slice(1))
-  ]);
-
-  const team = Array.from(uniqueNames)
+  const team = Array.from(staffNames)
     .map((name) => {
       const reviewCount = grouped[name] ? grouped[name].count : 0;
       const reviewTotal = grouped[name] ? grouped[name].total : 0;
@@ -533,7 +489,7 @@ function computeStats(monthRows) {
         avg: reviewCount ? reviewTotal / reviewCount : 0
       };
     })
-    .filter((member) => member.count > 0 || member.scans > 0)
+    .filter((member) => member.count > 0 || member.scans > 0) // Показываем тех, у кого есть либо отзывы, либо сканы
     .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
 
   return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
@@ -555,7 +511,7 @@ function renderTeamGrid(monthRows) {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'team-card' + (selectedBarista === member.name ? ' active-card' : '');
-    card.onclick = () => selectBarista(member.name);
+    card.onclick = () => selectBarista(member.name); // Важно для кликабельности
 
     card.innerHTML = `
       <div class="team-card-header">
@@ -579,6 +535,7 @@ function renderTeamGrid(monthRows) {
     grid.appendChild(card);
   });
 }
+
 /* ---------- Рендер: лента отзывов ---------- */
 
 function renderReviewsFeed(displayRows) {
