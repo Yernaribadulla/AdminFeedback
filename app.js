@@ -27,7 +27,6 @@ const fallbackData = [
 
 let allRows = [];
 let totalScansCount = 0;
-let allVisits = [];
 
 let selectedBarista = null;
 let onlyNegative = false;
@@ -205,46 +204,18 @@ async function fetchData() {
 async function loadScansData() {
   try {
     const response = await fetch(SCANS_URL);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
 
     const text = await response.text();
     const json = parseGvizResponse(text);
+    const rows = json.table && json.table.rows ? json.table.rows : [];
 
-    const rows = json.table?.rows || [];
-
-    allVisits = rows
-      .map((row) => {
-        if (!row.c) return null;
-
-        const rawDate = row.c[0]?.v || row.c[0]?.f;
-        const rawBarista = row.c[1]?.v || row.c[1]?.f;
-
-        if (!rawDate || !rawBarista) return null;
-
-        const dateObj = parseDateSafe(rawDate);
-
-        if (!dateObj) return null;
-
-        return {
-          dateObj,
-          monthKey: `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`,
-          barista: String(rawBarista).trim().toLowerCase()
-        };
-      })
-      .filter(Boolean);
-
-    totalScansCount = allVisits.length;
-
-    console.log("Visits:", allVisits);
-    console.log("Всего сканов:", totalScansCount);
-
+    // Считаем только строки, где реально есть данные (защита от пустых хвостов листа)
+    totalScansCount = rows.filter((row) =>
+      row.c && row.c.some((cell) => cell && cell.v !== null && cell.v !== undefined && cell.v !== '')
+    ).length;
   } catch (err) {
-    console.error("Ошибка загрузки Visits:", err);
-
-    allVisits = [];
+    console.warn('⚠️ Не удалось загрузить сканы с листа Visits:', err);
     totalScansCount = 0;
   }
 }
@@ -271,54 +242,27 @@ function computeStats(rows) {
   const totalScore = rows.reduce((sum, row) => sum + (Number(row.rating) || 0), 0);
   const avgRating = totalReviews ? totalScore / totalReviews : 0;
 
+  const staffNames = new Set(rows.map((row) => row.barista));
   const grouped = {};
+  staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
 
   rows.forEach((row) => {
-    const key = row.barista.trim().toLowerCase();
-
-    if (!grouped[key]) {
-      grouped[key] = {
-        name: row.barista,
-        count: 0,
-        total: 0,
-        scans: 0
-      };
-    }
-
-    grouped[key].count++;
-    grouped[key].total += Number(row.rating) || 0;
-  });
-
-  const currentMonthVisits = allVisits.filter((visit) => {
-    return (
-      selectedMonthKey === "all" ||
-      visit.monthKey === selectedMonthKey
-    );
-  });
-
-  currentMonthVisits.forEach((visit) => {
-    const key = visit.barista.trim().toLowerCase();
-
-    if (grouped[key]) {
-      grouped[key].scans++;
+    if (grouped[row.barista]) {
+      grouped[row.barista].count += 1;
+      grouped[row.barista].total += (Number(row.rating) || 0);
     }
   });
 
-  const team = Object.values(grouped)
-    .map((member) => ({
-      name: member.name,
-      count: member.count,
-      scans: member.scans,
-      avg: member.count ? member.total / member.count : 0
+  const team = Array.from(staffNames)
+    .map((name) => ({
+      name,
+      count: grouped[name].count,
+      avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
     }))
+    .filter((member) => member.count > 0)
     .sort((a, b) => b.avg - a.avg);
 
-  return {
-    totalReviews,
-    avgRating,
-    team,
-    best: team.length ? team[0] : null
-  };
+  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
 }
 
 /* ---------- Фильтрация: месяц + бариста + негатив ---------- */
@@ -336,6 +280,15 @@ function getDisplayRows() {
     if (onlyNegative && row.rating > 3) return false;
     return true;
   });
+}
+function selectBarista(name) {
+  if (selectedBarista === name) {
+    selectedBarista = null;
+  } else {
+    selectedBarista = name;
+  }
+
+  renderDashboard();
 }
 
 /* ---------- Executive Snapshot ---------- */
@@ -512,10 +465,44 @@ function renderBestEmployee(monthRows) {
 
 /* ---------- Рендер: карточки команды (по выбранному месяцу) ---------- */
 
+function computeStats(monthRows) {
+  const totalReviews = monthRows.length;
+  const avgRating = totalReviews
+    ? monthRows.reduce((sum, r) => sum + r.rating, 0) / totalReviews
+    : 0;
+
   // 1. Считаем сканы для каждого баристы за фильтруемый период
   // (берем из allVisits, отфильтрованного по текущему месяцу, если он есть)
+  const currentMonthVisits = typeof allVisits !== 'undefined' ? allVisits.filter(visit => {
+    return selectedMonth === 'all' || !selectedMonth || visit.month === selectedMonth;
+  }) : [];
 
+  const visitsGrouped = {};
+  currentMonthVisits.forEach(v => {
+    const name = (v.barista || '').trim().toLowerCase();
+    if (name) {
+      visitsGrouped[name] = (visitsGrouped[name] || 0) + 1;
+    }
+  });
 
+  const team = Array.from(staffNames)
+    .map((name) => {
+      const reviewCount = grouped[name] ? grouped[name].count : 0;
+      const reviewTotal = grouped[name] ? grouped[name].total : 0;
+      const scanCount = visitsGrouped[name.toLowerCase()] || 0;
+
+      return {
+        name,
+        count: reviewCount,
+        scans: scanCount,
+        avg: reviewCount ? reviewTotal / reviewCount : 0
+      };
+    })
+    .filter((member) => member.count > 0 || member.scans > 0) // Показываем тех, у кого есть либо отзывы, либо сканы
+    .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
+
+  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
+}
 
 function pluralizeScans(n) {
   if (n % 10 === 1 && n % 100 !== 11) return 'скан';
@@ -528,8 +515,6 @@ function renderTeamGrid(monthRows) {
   const grid = document.getElementById('team-grid');
   if (!grid) return;
   grid.innerHTML = '';
-
-  console.log(stats);
 
   stats.team.forEach((member) => {
     const card = document.createElement('button');
