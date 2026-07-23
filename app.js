@@ -26,6 +26,7 @@ const fallbackData = [
 /* ---------- Единое состояние дашборда ---------- */
 
 let allRows = [];
+let allVisits = [];
 let totalScansCount = 0;
 
 let selectedBarista = null;
@@ -204,18 +205,45 @@ async function fetchData() {
 async function loadScansData() {
   try {
     const response = await fetch(SCANS_URL);
-    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
 
     const text = await response.text();
     const json = parseGvizResponse(text);
-    const rows = json.table && json.table.rows ? json.table.rows : [];
 
-    // Считаем только строки, где реально есть данные (защита от пустых хвостов листа)
-    totalScansCount = rows.filter((row) =>
-      row.c && row.c.some((cell) => cell && cell.v !== null && cell.v !== undefined && cell.v !== '')
-    ).length;
+    const rows = json.table?.rows || [];
+
+    allVisits = rows
+      .map((row) => {
+        if (!row.c) return null;
+
+        const rawDate = row.c[0]?.v || row.c[0]?.f;
+        const rawBarista = row.c[1]?.v || row.c[1]?.f;
+
+        if (!rawDate || !rawBarista) return null;
+
+        const dateObj = parseDateSafe(rawDate);
+
+        if (!dateObj) return null;
+
+        return {
+          dateObj,
+          monthKey: `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`,
+          barista: String(rawBarista).trim().toLowerCase()
+        };
+      })
+      .filter(Boolean);
+
+    totalScansCount = allVisits.length;
+
+    console.log("Visits:", allVisits);
+
   } catch (err) {
-    console.warn('⚠️ Не удалось загрузить сканы с листа Visits:', err);
+    console.error(err);
+
+    allVisits = [];
     totalScansCount = 0;
   }
 }
@@ -474,7 +502,7 @@ function computeStats(monthRows) {
   // 1. Считаем сканы для каждого баристы за фильтруемый период
   // (берем из allVisits, отфильтрованного по текущему месяцу, если он есть)
   const currentMonthVisits = typeof allVisits !== 'undefined' ? allVisits.filter(visit => {
-    return selectedMonth === 'all' || !selectedMonth || visit.month === selectedMonth;
+    return selectedMonthKey === 'all' || !selectedMonthKey || visit.monthKey === selectedMonthKey;
   }) : [];
 
   const visitsGrouped = {};
@@ -484,6 +512,8 @@ function computeStats(monthRows) {
       visitsGrouped[name] = (visitsGrouped[name] || 0) + 1;
     }
   });
+
+  
 
   const team = Array.from(staffNames)
     .map((name) => {
