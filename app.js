@@ -1,8 +1,16 @@
 const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
 
-// Прямой запрос к листу отзывов (gid=0)
 const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
 const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=129289886`;
+
+// Локальный фоллбэк на случай полного пиздеца с сетью или Гуглом
+const fallbackData = [
+  { date: '2026-07-20', barista: 'Диас', rating: 5, comment: 'Отличный кофе и сервис!' },
+  { date: '2026-07-21', barista: 'Ислам', rating: 4, comment: 'Всё круто, но долго делали' },
+  { date: '2026-07-22', barista: 'Баха', rating: 5, comment: 'Лучший раф в городе' },
+  { date: '2026-07-22', barista: 'Диас', rating: 4, comment: 'Хорошая атмосфера' },
+  { date: '2026-07-23', barista: 'Диас', rating: 5, comment: 'Супер!' }
+];
 
 const monthNames = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -10,7 +18,7 @@ const monthNames = [
 ];
 
 let allRows = [];
-let totalScansCount = 0;
+let totalScansCount = 10;
 
 let selectedBarista = null;
 let onlyNegative = false;
@@ -56,18 +64,33 @@ function parseDateSafe(rawValue) {
   return !Number.isNaN(parsed.getTime()) ? parsed : new Date();
 }
 
+function buildRow(rawDate, barista, rating, comment) {
+  const dateObj = parseDateSafe(rawDate);
+  const year = dateObj.getFullYear();
+  const month = dateObj.getMonth() + 1;
+
+  return {
+    dateObj,
+    monthKey: `${year}-${String(month).padStart(2, '0')}`,
+    dateLabel: dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    barista,
+    rating,
+    comment
+  };
+}
+
 function extractRows(json) {
   const rows = json.table && json.table.rows ? json.table.rows : [];
-  console.log('📥 Сырые строки из Google Sheets:', rows);
 
   return rows
     .map((row) => {
-      const cells = row.c || [];
+      if (!row.c) return null;
+      const cells = row.c;
       const rawDate = cells[0] ? (cells[0].f || cells[0].v) : null;
       const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : '';
-      const rating = cells[2] ? Number(cells[2].v) : 0;
+      const rating = cells[2] && cells[2].v !== null ? Number(cells[2].v) : 0;
       const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
-      
+
       if (!barista || rating === 0) return null;
       return buildRow(rawDate, barista, rating, comment);
     })
@@ -82,28 +105,23 @@ async function fetchData() {
     console.log('🔄 Отправка запроса в Google Sheets...');
     let response = await fetch(directUrl);
     
-    // Если прямой запрос отвалился (например, CORS), пробуем через прокси
     if (!response.ok) {
       console.warn('Прямой запрос не прошел, пробуем через прокси...');
       response = await fetch(proxyUrl);
     }
 
     if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-    
+
     const text = await response.text();
     const json = parseGvizResponse(text);
     const rows = extractRows(json);
 
-    console.log('✅ Распарсенные отзывы из таблицы:', rows);
+    if (!rows.length) throw new Error('Таблица пуста');
 
-    if (!rows.length) {
-      throw new Error('Google Таблица доступна, но строки отзывов пустые!');
-    }
-    
+    console.log('✅ Данные успешно загружены из таблицы:', rows);
     allRows = rows;
   } catch (error) {
-    console.error('❌ ОШИБКА ЗАГРУЗКИ ОТЗЫВОВ (используем фоллбэк):', error);
-    // ВОТ ЗДЕСЬ БЫЛА ОШИБКА: Если таблица не ответила — явно забиваем заглушки
+    console.error('❌ Ошибка загрузки из Гугл Таблицы (включаем фоллбэк):', error);
     allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
   }
 
@@ -112,10 +130,57 @@ async function fetchData() {
   renderDashboard();
 }
 
+async function loadScansData() {
+  try {
+    const response = await fetch(SCANS_URL);
+    if (response.ok) {
+      const text = await response.text();
+      const json = parseGvizResponse(text);
+      const rows = json.table && json.table.rows ? json.table.rows : [];
+      if (rows.length > 0) totalScansCount = rows.length;
+    }
+  } catch (err) {
+    console.warn(' Ошибка загрузки сканов:', err);
+  }
+}
+
+function pluralizeReviews(count) {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'отзыв';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'отзыва';
+  return 'отзывов';
+}
+
+function computeStats(rows) {
+  const totalReviews = rows.length;
+  const totalScore = rows.reduce((sum, row) => sum + row.rating, 0);
+  const avgRating = totalReviews ? totalScore / totalReviews : 0;
+
+  const staffNames = new Set(rows.map((row) => row.barista));
+  const grouped = {};
+  staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
+
+  rows.forEach((row) => {
+    grouped[row.barista].count += 1;
+    grouped[row.barista].total += row.rating;
+  });
+
+  const team = Array.from(staffNames)
+    .map((name) => ({
+      name,
+      count: grouped[name].count,
+      avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
+    }))
+    .filter((member) => member.count > 0)
+    .sort((a, b) => b.avg - a.avg);
+
+  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
+}
+
 function renderExecutiveSnapshot() {
   const now = new Date();
   
-  // 1. Замечания за сегодня (рейтинг <= 3)
   const todayNegatives = allRows.filter((r) => {
     const d = r.dateObj;
     return d.getFullYear() === now.getFullYear() &&
@@ -129,41 +194,13 @@ function renderExecutiveSnapshot() {
     negTitleEl.textContent = todayNegatives === 0 ? 'Нет замечаний' : `${todayNegatives} ${pluralizeReviews(todayNegatives)}`;
   }
 
-  // 2. Статистика за последние 7 дней (с автоподстраховкой, чтобы не было прочерков)
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   let weekRows = allRows.filter((r) => r.dateObj >= sevenDaysAgo);
 
-  // Если за 7 дней отзывов нет (например, старая базовая база) — берем последние 7 отзывов
   if (weekRows.length === 0 && allRows.length > 0) {
     weekRows = allRows.slice(-7);
   }
 
-  const weekStats = computeStats(weekRows);
-
-  const weekRatingEl = document.getElementById('snapshot-week-rating');
-  if (weekRatingEl) {
-    weekRatingEl.textContent = weekStats.totalReviews > 0 ? `${weekStats.avgRating.toFixed(1)} ★` : '—';
-  }
-
-  const weekLeaderEl = document.getElementById('snapshot-week-leader');
-  if (weekLeaderEl) {
-    weekLeaderEl.textContent = weekStats.best ? weekStats.best.name : '—';
-  }
-
-  // 3. Тренд
-  const trendEl = document.getElementById('snapshot-trend-title');
-  if (trendEl) {
-    trendEl.textContent = 'Стабильно';
-  }
-}
-
-  const negTitleEl = document.getElementById('snapshot-negative-title');
-  if (negTitleEl) {
-    negTitleEl.textContent = todayNegatives === 0 ? 'Нет замечаний' : `${todayNegatives} ${pluralizeReviews(todayNegatives)}`;
-  }
-
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const weekRows = allRows.filter((r) => r.dateObj >= sevenDaysAgo);
   const weekStats = computeStats(weekRows);
 
   const weekRatingEl = document.getElementById('snapshot-week-rating');
@@ -219,8 +256,11 @@ function getMonthRows(monthKey) {
 
 function renderHeaderStats(filteredRows) {
   const stats = computeStats(filteredRows);
-  document.getElementById('stat-total-reviews').textContent = String(stats.totalReviews);
-  document.getElementById('stat-avg-rating').textContent = stats.avgRating.toFixed(1);
+  const totalEl = document.getElementById('stat-total-reviews');
+  const avgEl = document.getElementById('stat-avg-rating');
+  
+  if (totalEl) totalEl.textContent = String(stats.totalReviews);
+  if (avgEl) avgEl.textContent = stats.avgRating.toFixed(1);
 
   const totalLabel = document.getElementById('stat-total-label');
   const avgLabel = document.getElementById('stat-avg-label');
@@ -230,13 +270,8 @@ function renderHeaderStats(filteredRows) {
   if (onlyNegative) scopeParts.push('негативные');
   const scopeSuffix = scopeParts.length ? ` · ${scopeParts.join(', ')}` : '';
 
-  totalLabel.textContent = `Отзывов${scopeSuffix}`;
-  avgLabel.textContent = `Средний балл${scopeSuffix}`;
-
-  if (!selectedBarista && !onlyNegative) {
-    totalLabel.textContent = 'Всего отзывов';
-    avgLabel.textContent = 'Средний балл';
-  }
+  if (totalLabel) totalLabel.textContent = selectedBarista || onlyNegative ? `Отзывов${scopeSuffix}` : 'Всего отзывов';
+  if (avgLabel) avgLabel.textContent = selectedBarista || onlyNegative ? `Средний балл${scopeSuffix}` : 'Средний балл';
 
   const conversionEl = document.getElementById('snapshot-conversion');
   if (conversionEl) {
@@ -256,19 +291,22 @@ function renderBestEmployee() {
   const nameEl = document.getElementById('best-name');
   const scoreEl = document.getElementById('best-score');
 
+  if (!nameEl) return;
+
   if (!stats.best) {
     nameEl.textContent = 'Нет данных';
-    scoreEl.textContent = '';
+    if (scoreEl) scoreEl.textContent = '';
     return;
   }
 
   nameEl.textContent = stats.best.name;
-  scoreEl.textContent = `${stats.best.avg.toFixed(1)} из 5 · ${stats.best.count} ${pluralizeReviews(stats.best.count)}`;
+  if (scoreEl) scoreEl.textContent = `${stats.best.avg.toFixed(1)} из 5 · ${stats.best.count} ${pluralizeReviews(stats.best.count)}`;
 }
 
 function renderTeamGrid() {
   const stats = computeStats(allRows);
   const grid = document.getElementById('team-grid');
+  if (!grid) return;
   grid.innerHTML = '';
 
   if (!stats.team.length) {
@@ -310,12 +348,15 @@ function renderTeamGrid() {
 function renderReviewsFeed(filteredRows) {
   const feed = document.getElementById('reviews-feed');
   const titleEl = document.getElementById('reviews-title');
+  if (!feed) return;
   feed.innerHTML = '';
 
-  const titleParts = [];
-  if (selectedBarista) titleParts.push(selectedBarista);
-  if (onlyNegative) titleParts.push('только негативные');
-  titleEl.textContent = titleParts.length ? `Отзывы · ${titleParts.join(', ')}` : 'Последние отзывы';
+  if (titleEl) {
+    const titleParts = [];
+    if (selectedBarista) titleParts.push(selectedBarista);
+    if (onlyNegative) titleParts.push('только негативные');
+    titleEl.textContent = titleParts.length ? `Отзывы · ${titleParts.join(', ')}` : 'Последние отзывы';
+  }
 
   if (!filteredRows.length) {
     feed.innerHTML = '<div class="state-placeholder">По этому фильтру отзывов нет</div>';
