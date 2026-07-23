@@ -1,6 +1,6 @@
 const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
 
-// Ссылки на листы Отзывов (gid=0) и Сканов (gid=129289886)
+// Прямой запрос к листу отзывов (gid=0)
 const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
 const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=129289886`;
 
@@ -9,23 +9,9 @@ const monthNames = [
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
 ];
 
-const fallbackData = [
-  { date: '14.07.2026 9:32:10', barista: 'Ислам', rating: 5, comment: 'Очень тепло встретил, кофе идеальный.' },
-  { date: '2026-07-13T18:04:00', barista: 'Диас', rating: 4, comment: 'Быстро и вкусно, но было многолюдно.' },
-  { date: '12.07.2026 8:15:47', barista: 'Баха', rating: 5, comment: 'Лучший раф на пирсе, спасибо!' },
-  { date: '2026-07-11T11:20:33', barista: 'Ислам', rating: 5, comment: 'Приятная атмосфера и внимательный сервис.' },
-  { date: '10.07.2026 19:41:02', barista: 'Диас', rating: 5, comment: 'Отличная подача, красиво оформили латте-арт.' },
-  { date: '2026-07-09T07:58:19', barista: 'Баха', rating: 2, comment: 'Ждали заказ почти двадцать минут.' },
-  { date: '08.07.2026 12:03:55', barista: 'Ислам', rating: 4, comment: 'Хороший кофе, немного шумно у пирса.' },
-  { date: '2026-07-07T16:44:10', barista: 'Диас', rating: 5, comment: 'Порекомендовал напиток по вкусу — попал в точку.' },
-  { date: '06.07.2026 9:29:00', barista: 'Баха', rating: 5, comment: 'Очень дружелюбно и профессионально.' },
-  { date: '2026-07-05T14:12:47', barista: 'Ислам', rating: 3, comment: 'Кофе остыл, пока несли к столику.' }
-];
-
 let allRows = [];
 let totalScansCount = 0;
 
-// Состояния фильтров
 let selectedBarista = null;
 let onlyNegative = false;
 let selectedMonthKey = 'all';
@@ -33,16 +19,15 @@ let selectedMonthKey = 'all';
 function parseGvizResponse(text) {
   const match = text.match(/setResponse\(([\s\S]*)\);?\s*$/);
   if (!match) {
-    throw new Error('Не удалось распознать ответ Google Sheets');
+    throw new Error('CORS или структура ответа Google Таблицы некорректна');
   }
   return JSON.parse(match[1]);
 }
 
 function parseDateSafe(rawValue) {
-  if (!rawValue) return null;
+  if (!rawValue) return new Date();
   const value = String(rawValue).trim();
 
-  // Поддержка Google Date(2026,6,19,...)
   const gvizMatch = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)/.exec(value);
   if (gvizMatch) {
     return new Date(
@@ -55,7 +40,6 @@ function parseDateSafe(rawValue) {
     );
   }
 
-  // Поддержка формата DD.MM.YYYY HH:mm:ss
   const dottedMatch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{1,2}):(\d{1,2}))?/.exec(value);
   if (dottedMatch) {
     return new Date(
@@ -69,29 +53,31 @@ function parseDateSafe(rawValue) {
   }
 
   const parsed = new Date(value);
-  return !Number.isNaN(parsed.getTime()) ? parsed : null;
+  return !Number.isNaN(parsed.getTime()) ? parsed : new Date();
 }
 
 function extractRows(json) {
   const rows = json.table && json.table.rows ? json.table.rows : [];
+  console.log('📥 Сырые строки из Google Sheets:', rows);
+
   return rows
     .map((row) => {
       const cells = row.c || [];
-      // Если у даты есть параметр f (formatted value), берем его, иначе v
       const rawDate = cells[0] ? (cells[0].f || cells[0].v) : null;
-      const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : 'Неизвестно';
+      const barista = cells[1] && cells[1].v ? String(cells[1].v).trim() : '';
       const rating = cells[2] ? Number(cells[2].v) : 0;
       const comment = cells[3] && cells[3].v ? String(cells[3].v) : '';
+      
+      if (!barista || rating === 0) return null;
       return buildRow(rawDate, barista, rating, comment);
     })
-    .filter((row) => row.rating > 0);
+    .filter(Boolean);
 }
 
 function buildRow(rawDate, barista, rating, comment) {
-  const dateObj = parseDateSafe(rawDate) || new Date();
+  const dateObj = parseDateSafe(rawDate);
   const year = dateObj.getFullYear();
   const month = dateObj.getMonth() + 1;
-  const day = dateObj.getDate();
 
   return {
     dateObj,
@@ -105,16 +91,23 @@ function buildRow(rawDate, barista, rating, comment) {
 
 async function fetchData() {
   try {
+    console.log('🔄 Отправка запроса в Google Sheets...');
     const response = await fetch(REVIEWS_URL);
-    if (!response.ok) throw new Error('Сеть недоступна');
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+    
     const text = await response.text();
     const json = parseGvizResponse(text);
     const rows = extractRows(json);
-    if (!rows.length) throw new Error('Таблица пуста');
+
+    console.log('✅ Распарсенные отзывы:', rows);
+
+    if (!rows.length) {
+      throw new Error('Google Таблица доступна, но строки отзывов пустые!');
+    }
+    
     allRows = rows;
   } catch (error) {
-    console.warn('Загружены фоллбэк данные:', error);
-    allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
+    console.error('❌ ОШИБКА ЗАГРУЗКИ ОТЗЫВОВ:', error);
   }
 
   await loadScansData();
@@ -132,7 +125,7 @@ async function loadScansData() {
       totalScansCount = rows.length;
     }
   } catch (err) {
-    console.warn('Ошибка загрузки сканов:', err);
+    console.warn(' Ошибка загрузки сканов:', err);
   }
 }
 
@@ -170,12 +163,9 @@ function computeStats(rows) {
   return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
 }
 
-/* ---------- Расчет карточек Executive Snapshot ---------- */
-
 function renderExecutiveSnapshot() {
   const now = new Date();
   
-  // 1. Негативные за сегодня (<= 3 звезд)
   const todayNegatives = allRows.filter((r) => {
     const d = r.dateObj;
     return d.getFullYear() === now.getFullYear() &&
@@ -189,7 +179,6 @@ function renderExecutiveSnapshot() {
     negTitleEl.textContent = todayNegatives === 0 ? 'Нет замечаний' : `${todayNegatives} ${pluralizeReviews(todayNegatives)}`;
   }
 
-  // 2. Статистика за последние 7 дней
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const weekRows = allRows.filter((r) => r.dateObj >= sevenDaysAgo);
   const weekStats = computeStats(weekRows);
@@ -204,7 +193,6 @@ function renderExecutiveSnapshot() {
     weekLeaderEl.textContent = weekStats.best ? weekStats.best.name : '—';
   }
 
-  // 3. Тренд по команде
   const trendEl = document.getElementById('snapshot-trend-title');
   if (trendEl) {
     trendEl.textContent = 'Стабильно';
