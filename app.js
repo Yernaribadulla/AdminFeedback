@@ -560,6 +560,8 @@ function renderTeamGrid(monthRows) {
   if (!grid) return;
   grid.innerHTML = '';
 
+  console.log(stats);
+
   stats.team.forEach((member) => {
     const card = document.createElement('button');
     card.type = 'button';
