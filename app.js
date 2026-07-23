@@ -1,5 +1,9 @@
 const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
-const SHEET_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`;
+
+// Ссылки на листы Отзывов (gid=0) и Сканов (gid=129289886)
+const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
+const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=129289886`;
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXMPd1JZebIeGPigGQDgPGndeJacY117CZdBWjANbRqkd0KgwJPurMKMiOwP4a8bEN/exec";
 
 const monthNames = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
@@ -16,16 +20,11 @@ const fallbackData = [
   { date: '08.07.2026 12:03:55', barista: 'Ислам', rating: 4, comment: 'Хороший кофе, немного шумно у пирса.' },
   { date: '2026-07-07T16:44:10', barista: 'Диас', rating: 5, comment: 'Порекомендовал напиток по вкусу — попал в точку.' },
   { date: '06.07.2026 9:29:00', barista: 'Баха', rating: 5, comment: 'Очень дружелюбно и профессионально.' },
-  { date: '2026-07-05T14:12:47', barista: 'Ислам', rating: 3, comment: 'Кофе остыл, пока несли к столику.' },
-  { date: '04.06.2026 10:05:22', barista: 'Диас', rating: 2, comment: 'Перепутали заказ, пришлось ждать замену.' },
-  { date: '2026-06-28T09:17:41', barista: 'Баха', rating: 5, comment: 'Прекрасный сервис, как всегда.' },
-  { date: '20.06.2026 17:50:03', barista: 'Ислам', rating: 5, comment: 'Спасибо за рекомендацию по вкусу!' },
-  { date: '2026-06-15T13:33:29', barista: 'Диас', rating: 1, comment: 'Грубо ответил на просьбу пересчитать.' },
-  { date: '10.06.2026 8:47:15', barista: 'Баха', rating: 4, comment: 'Всё хорошо, чуть медленно в час пик.' }
+  { date: '2026-07-05T14:12:47', barista: 'Ислам', rating: 3, comment: 'Кофе остыл, пока несли к столику.' }
 ];
 
-// Все загруженные отзывы храним в памяти — фильтруем без повторных запросов к сети
 let allRows = [];
+let totalScansCount = 0;
 
 // Состояния фильтров
 let selectedBarista = null;
@@ -40,14 +39,6 @@ function parseGvizResponse(text) {
   return JSON.parse(match[1]);
 }
 
-/**
- * Надёжно разбирает дату из Google Sheets в разных форматах:
- * - объект gviz: Date(2026,6,19,...)
- * - "19.07.2026 0:01:35" (день.месяц.год + время)
- * - "2026-07-19T00:01:35" (ISO + время)
- * Игнорирует время, возвращает { year, month, day } с месяцем 1–12,
- * либо null, если строку разобрать не удалось.
- */
 function parseDateSafe(rawValue) {
   if (!rawValue) return null;
   const value = String(rawValue).trim();
@@ -130,7 +121,7 @@ function buildRow(rawDate, barista, rating, comment) {
 
 async function fetchData() {
   try {
-    const response = await fetch(SHEET_URL);
+    const response = await fetch(REVIEWS_URL);
     if (!response.ok) throw new Error('Сеть недоступна');
     const text = await response.text();
     const json = parseGvizResponse(text);
@@ -138,11 +129,29 @@ async function fetchData() {
     if (!rows.length) throw new Error('Таблица пуста');
     allRows = rows;
   } catch (error) {
-    console.warn('Не удалось загрузить данные из Google Sheets, используются тестовые данные.', error);
+    console.warn('Не удалось загрузить отзывы из Google Sheets, используются резервные данные.', error);
     allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
   }
+
+  // Загружаем сканы для расчета реальной конверсии
+  await loadScansData();
+
   populateMonthSelect();
   renderDashboard();
+}
+
+async function loadScansData() {
+  try {
+    const response = await fetch(SCANS_URL);
+    if (response.ok) {
+      const text = await response.text();
+      const json = parseGvizResponse(text);
+      const rows = json.table && json.table.rows ? json.table.rows : [];
+      totalScansCount = rows.length;
+    }
+  } catch (err) {
+    console.warn('Ошибка при получении сканов QR:', err);
+  }
 }
 
 function pluralizeReviews(count) {
@@ -158,7 +167,6 @@ function computeStats(rows) {
   const totalScore = rows.reduce((sum, row) => sum + row.rating, 0);
   const avgRating = totalReviews ? totalScore / totalReviews : 0;
 
-  // Список сотрудников собирается динамически, без хардкода имён
   const staffNames = new Set(rows.map((row) => row.barista));
 
   const grouped = {};
@@ -182,16 +190,12 @@ function computeStats(rows) {
   return { totalReviews, avgRating, team, best };
 }
 
-/* ---------- Заполнение селекта месяцев ---------- */
-
 function populateMonthSelect() {
   const select = document.getElementById('month-select');
+  if (!select) return;
+
   const previousValue = select.value || 'all';
-
-  const uniqueKeys = new Set(
-    allRows.map((row) => row.monthKey).filter(Boolean)
-  );
-
+  const uniqueKeys = new Set(allRows.map((row) => row.monthKey).filter(Boolean));
   const sortedKeys = Array.from(uniqueKeys).sort();
 
   select.innerHTML = '';
@@ -213,8 +217,6 @@ function populateMonthSelect() {
   selectedMonthKey = select.value;
 }
 
-/* ---------- Комбинированная фильтрация в памяти ---------- */
-
 function getDisplayRows() {
   return allRows.filter((row) => {
     if (selectedBarista && row.barista !== selectedBarista) return false;
@@ -227,8 +229,6 @@ function getMonthRows(monthKey) {
   if (monthKey === 'all') return allRows;
   return allRows.filter((row) => row.monthKey === monthKey);
 }
-
-/* ---------- Рендер отдельных блоков ---------- */
 
 function renderHeaderStats(filteredRows) {
   const stats = computeStats(filteredRows);
@@ -243,12 +243,23 @@ function renderHeaderStats(filteredRows) {
   if (onlyNegative) scopeParts.push('негативные');
   const scopeSuffix = scopeParts.length ? ` · ${scopeParts.join(', ')}` : '';
 
-  totalLabel.textContent = `Отзывов${scopeSuffix ? scopeSuffix : ''}`.trim();
-  avgLabel.textContent = `Средний балл${scopeSuffix ? scopeSuffix : ''}`.trim();
+  totalLabel.textContent = `Отзывов${scopeSuffix}`;
+  avgLabel.textContent = `Средний балл${scopeSuffix}`;
 
   if (!selectedBarista && !onlyNegative) {
     totalLabel.textContent = 'Всего отзывов';
     avgLabel.textContent = 'Средний балл';
+  }
+
+  // Расчет живой конверсии QR
+  const conversionEl = document.getElementById('snapshot-conversion');
+  if (conversionEl) {
+    if (totalScansCount > 0) {
+      const rate = ((allRows.length / totalScansCount) * 100).toFixed(1);
+      conversionEl.textContent = `${rate}%`;
+    } else {
+      conversionEl.textContent = '0%';
+    }
   }
 }
 
@@ -260,7 +271,7 @@ function renderBestEmployee() {
   const scoreEl = document.getElementById('best-score');
 
   if (!stats.best) {
-    nameEl.textContent = 'Нет данных за этот период';
+    nameEl.textContent = 'Нет данных';
     scoreEl.textContent = '';
     return;
   }
@@ -275,68 +286,31 @@ function renderTeamGrid() {
   grid.innerHTML = '';
 
   if (!stats.team.length) {
-    const placeholder = document.createElement('div');
-    placeholder.className = 'state-placeholder';
-    placeholder.textContent = 'Нет данных по команде';
-    grid.appendChild(placeholder);
+    grid.innerHTML = '<div class="state-placeholder">Нет данных по команде</div>';
     return;
   }
 
   stats.team.forEach((member) => {
     const card = document.createElement('button');
     card.type = 'button';
-    card.className = 'team-card';
-    if (selectedBarista === member.name) {
-      card.classList.add('active-card');
-    }
+    card.className = 'team-card' + (selectedBarista === member.name ? ' active-card' : '');
 
-    const header = document.createElement('div');
-    header.className = 'team-card-header';
-
-    const avatar = document.createElement('div');
-    avatar.className = 'team-avatar';
-    avatar.textContent = member.name.charAt(0).toUpperCase();
-
-    const nameBlock = document.createElement('div');
-    const name = document.createElement('div');
-    name.className = 'team-name';
-    name.textContent = member.name;
-
-    const count = document.createElement('div');
-    count.className = 'team-count';
-    count.textContent = `${member.count} ${pluralizeReviews(member.count)}`;
-
-    nameBlock.appendChild(name);
-    nameBlock.appendChild(count);
-    header.appendChild(avatar);
-    header.appendChild(nameBlock);
-
-    const scoreRow = document.createElement('div');
-    scoreRow.className = 'team-score-row';
-
-    const scoreValue = document.createElement('span');
-    scoreValue.className = 'team-score-value';
-    scoreValue.textContent = member.avg.toFixed(1);
-
-    const scoreMax = document.createElement('span');
-    scoreMax.className = 'team-score-max';
-    scoreMax.textContent = 'из 5.0';
-
-    scoreRow.appendChild(scoreValue);
-    scoreRow.appendChild(scoreMax);
-
-    const progressTrack = document.createElement('div');
-    progressTrack.className = 'progress-track';
-
-    const progressFill = document.createElement('div');
-    progressFill.className = 'progress-fill';
-    progressFill.style.width = `${Math.min((member.avg / 5) * 100, 100)}%`;
-
-    progressTrack.appendChild(progressFill);
-
-    card.appendChild(header);
-    card.appendChild(scoreRow);
-    card.appendChild(progressTrack);
+    card.innerHTML = `
+      <div class="team-card-header">
+        <div class="team-avatar">${member.name.charAt(0).toUpperCase()}</div>
+        <div>
+          <div class="team-name">${member.name}</div>
+          <div class="team-count">${member.count} ${pluralizeReviews(member.count)}</div>
+        </div>
+      </div>
+      <div class="team-score-row">
+        <span class="team-score-value">${member.avg.toFixed(1)}</span>
+        <span class="team-score-max">из 5.0</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" style="width: ${Math.min((member.avg / 5) * 100, 100)}%"></div>
+      </div>
+    `;
 
     card.addEventListener('click', () => {
       selectedBarista = selectedBarista === member.name ? null : member.name;
@@ -345,19 +319,6 @@ function renderTeamGrid() {
 
     grid.appendChild(card);
   });
-}
-
-/* ---------- Лента отзывов с эффектом "тумана" ---------- */
-
-function getStaggerDelay(index) {
-  const SLOW_STEP = 100;
-  const FAST_STEP = 18;
-  const SLOW_COUNT = 6;
-
-  if (index < SLOW_COUNT) {
-    return index * SLOW_STEP;
-  }
-  return SLOW_COUNT * SLOW_STEP + (index - SLOW_COUNT + 1) * FAST_STEP;
 }
 
 function renderReviewsFeed(filteredRows) {
@@ -371,49 +332,23 @@ function renderReviewsFeed(filteredRows) {
   titleEl.textContent = titleParts.length ? `Отзывы · ${titleParts.join(', ')}` : 'Последние отзывы';
 
   if (!filteredRows.length) {
-    const placeholder = document.createElement('div');
-    placeholder.className = 'state-placeholder';
-    placeholder.textContent = 'По этому фильтру отзывов нет';
-    feed.appendChild(placeholder);
+    feed.innerHTML = '<div class="state-placeholder">По этому фильтру отзывов нет</div>';
     return;
   }
 
-  const recentRows = filteredRows.slice().reverse();
-
-  recentRows.forEach((row, index) => {
+  filteredRows.slice().reverse().forEach((row) => {
     const isNegative = row.rating <= 3;
-
     const item = document.createElement('div');
     item.className = 'review-item' + (isNegative ? ' is-negative' : '');
-    item.style.animationDelay = `${getStaggerDelay(index)}ms`;
 
-    const meta = document.createElement('div');
-    meta.className = 'review-meta';
-
-    const barista = document.createElement('span');
-    barista.className = 'review-barista';
-    barista.textContent = row.barista;
-
-    const date = document.createElement('span');
-    date.className = 'review-date';
-    date.textContent = row.dateLabel;
-
-    const rating = document.createElement('span');
-    rating.className = 'review-rating' + (isNegative ? ' is-negative' : '');
-    rating.textContent = `${row.rating} ★`;
-
-    meta.appendChild(barista);
-    meta.appendChild(date);
-    meta.appendChild(rating);
-
-    item.appendChild(meta);
-
-    if (row.comment) {
-      const comment = document.createElement('p');
-      comment.className = 'review-comment';
-      comment.textContent = row.comment;
-      item.appendChild(comment);
-    }
+    item.innerHTML = `
+      <div class="review-meta">
+        <span class="review-barista">${row.barista}</span>
+        <span class="review-date">${row.dateLabel}</span>
+        <span class="review-rating ${isNegative ? 'is-negative' : ''}">${row.rating} ★</span>
+      </div>
+      ${row.comment ? `<p class="review-comment">${row.comment}</p>` : ''}
+    `;
 
     feed.appendChild(item);
   });
@@ -421,10 +356,10 @@ function renderReviewsFeed(filteredRows) {
 
 function renderFilterButtons() {
   const resetBtn = document.getElementById('reset-filter-btn');
-  resetBtn.classList.toggle('is-disabled', selectedBarista === null);
+  if (resetBtn) resetBtn.classList.toggle('is-disabled', selectedBarista === null);
 
   const negativeBtn = document.getElementById('negative-filter-btn');
-  negativeBtn.classList.toggle('is-active', onlyNegative);
+  if (negativeBtn) negativeBtn.classList.toggle('is-active', onlyNegative);
 }
 
 function renderDashboard() {
@@ -437,39 +372,30 @@ function renderDashboard() {
   renderFilterButtons();
 }
 
-document.getElementById('reset-filter-btn').addEventListener('click', () => {
-  selectedBarista = null;
-  renderDashboard();
-});
-
-document.getElementById('negative-filter-btn').addEventListener('click', () => {
-  onlyNegative = !onlyNegative;
-  renderDashboard();
-});
-
-document.getElementById('month-select').addEventListener('change', (event) => {
-  selectedMonthKey = event.target.value;
-  renderBestEmployee();
-});
-
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXMPd1JZebIeGPigGQDgPGndeJacY117CZdBWjANbRqkd0KgwJPurMKMiOwP4a8bEN/exec";
-
-async function loadConversionData() {
-  try {
-    const response = await fetch(GOOGLE_SCRIPT_URL);
-    const data = await response.json();
-
-    if (data.status === "success") {
-      const conversionEl = document.getElementById("snapshot-conversion");
-      if (conversionEl) {
-        conversionEl.textContent = data.conversionRate + "%";
-      }
-    }
-  } catch (err) {
-    console.error("Ошибка при загрузке конверсии:", err);
+document.addEventListener('DOMContentLoaded', () => {
+  const resetBtn = document.getElementById('reset-filter-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      selectedBarista = null;
+      renderDashboard();
+    });
   }
-}
 
-document.addEventListener("DOMContentLoaded", loadConversionData);
+  const negativeBtn = document.getElementById('negative-filter-btn');
+  if (negativeBtn) {
+    negativeBtn.addEventListener('click', () => {
+      onlyNegative = !onlyNegative;
+      renderDashboard();
+    });
+  }
 
-fetchData();
+  const monthSelect = document.getElementById('month-select');
+  if (monthSelect) {
+    monthSelect.addEventListener('change', (event) => {
+      selectedMonthKey = event.target.value;
+      renderBestEmployee();
+    });
+  }
+
+  fetchData();
+});
