@@ -282,13 +282,22 @@ function computeStats(rows) {
   });
 
   const team = Array.from(staffNames)
-    .map((name) => ({
+  .map((name) => {
+    const scans = Array.isArray(allVisits)
+      ? allVisits.filter((v) => v.barista === name.toLowerCase()).length
+      : 0;
+
+    return {
       name,
       count: grouped[name].count,
-      avg: grouped[name].count ? grouped[name].total / grouped[name].count : 0
-    }))
-    .filter((member) => member.count > 0)
-    .sort((a, b) => b.avg - a.avg);
+      scans,
+      avg: grouped[name].count
+        ? grouped[name].total / grouped[name].count
+        : 0
+    };
+  })
+  .filter((member) => member.count > 0 || member.scans > 0)
+  .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
 
   return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
 }
@@ -493,52 +502,7 @@ function renderBestEmployee(monthRows) {
 
 /* ---------- Рендер: карточки команды (по выбранному месяцу) ---------- */
 
-function computeStats(monthRows) {
-  const totalReviews = monthRows.length;
-  const avgRating = totalReviews
-    ? monthRows.reduce((sum, r) => sum + r.rating, 0) / totalReviews
-    : 0;
 
-  // 1. Считаем сканы для каждого баристы за фильтруемый период
-  // (берем из allVisits, отфильтрованного по текущему месяцу, если он есть)
-  const currentMonthVisits = typeof allVisits !== 'undefined' ? allVisits.filter(visit => {
-    return selectedMonthKey === 'all' || !selectedMonthKey || visit.monthKey === selectedMonthKey;
-  }) : [];
-
-  const visitsGrouped = {};
-  currentMonthVisits.forEach(v => {
-    const name = (v.barista || '').trim().toLowerCase();
-    if (name) {
-      visitsGrouped[name] = (visitsGrouped[name] || 0) + 1;
-    }
-  });
-
-  
-
-  const team = Array.from(staffNames)
-    .map((name) => {
-      const reviewCount = grouped[name] ? grouped[name].count : 0;
-      const reviewTotal = grouped[name] ? grouped[name].total : 0;
-      const scanCount = visitsGrouped[name.toLowerCase()] || 0;
-
-      return {
-        name,
-        count: reviewCount,
-        scans: scanCount,
-        avg: reviewCount ? reviewTotal / reviewCount : 0
-      };
-    })
-    .filter((member) => member.count > 0 || member.scans > 0) // Показываем тех, у кого есть либо отзывы, либо сканы
-    .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
-
-  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
-}
-
-function pluralizeScans(n) {
-  if (n % 10 === 1 && n % 100 !== 11) return 'скан';
-  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'скана';
-  return 'сканов';
-}
 
 function renderTeamGrid(monthRows) {
   const stats = computeStats(monthRows);
