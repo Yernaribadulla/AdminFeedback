@@ -489,8 +489,7 @@ function computeStats(monthRows) {
     ? monthRows.reduce((sum, r) => sum + r.rating, 0) / totalReviews
     : 0;
 
-  // 1. Считаем сканы для каждого баристы за фильтруемый период
-  // (берем из allVisits, отфильтрованного по текущему месяцу, если он есть)
+  // 1. Считаем сканы за период
   const currentMonthVisits = typeof allVisits !== 'undefined' ? allVisits.filter(visit => {
     return selectedMonth === 'all' || !selectedMonth || visit.month === selectedMonth;
   }) : [];
@@ -503,7 +502,25 @@ function computeStats(monthRows) {
     }
   });
 
-  const team = Array.from(staffNames)
+  // 2. Группируем отзывы по именам барист
+  const grouped = {};
+  monthRows.forEach(r => {
+    const name = (r.barista || '').trim();
+    if (!name) return;
+    if (!grouped[name]) {
+      grouped[name] = { count: 0, total: 0 };
+    }
+    grouped[name].count += 1;
+    grouped[name].total += r.rating;
+  });
+
+  // 3. Формируем список всех сотрудников из отзывов и сканов
+  const uniqueNames = new Set([
+    ...Object.keys(grouped),
+    ...Object.keys(visitsGrouped).map(n => n.charAt(0).toUpperCase() + n.slice(1))
+  ]);
+
+  const team = Array.from(uniqueNames)
     .map((name) => {
       const reviewCount = grouped[name] ? grouped[name].count : 0;
       const reviewTotal = grouped[name] ? grouped[name].total : 0;
@@ -516,53 +533,11 @@ function computeStats(monthRows) {
         avg: reviewCount ? reviewTotal / reviewCount : 0
       };
     })
-    .filter((member) => member.count > 0 || member.scans > 0) // Показываем тех, у кого есть либо отзывы, либо сканы
+    .filter((member) => member.count > 0 || member.scans > 0)
     .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
 
   return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
 }
-
-function pluralizeScans(n) {
-  if (n % 10 === 1 && n % 100 !== 11) return 'скан';
-  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'скана';
-  return 'сканов';
-}
-
-function renderTeamGrid(monthRows) {
-  const stats = computeStats(monthRows);
-  const grid = document.getElementById('team-grid');
-  if (!grid) return;
-  grid.innerHTML = '';
-
-  stats.team.forEach((member) => {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'team-card' + (selectedBarista === member.name ? ' active-card' : '');
-    card.onclick = () => selectBarista(member.name); // Важно для кликабельности
-
-    card.innerHTML = `
-      <div class="team-card-header">
-        <div class="team-avatar">${member.name.charAt(0).toUpperCase()}</div>
-        <div>
-          <div class="team-name">${member.name}</div>
-          <div class="team-count">
-            ${member.count} ${pluralizeReviews(member.count)} · ${member.scans} ${pluralizeScans(member.scans)}
-          </div>
-        </div>
-      </div>
-      <div class="team-score-row">
-        <span class="team-score-value">${member.avg ? member.avg.toFixed(1) : '0.0'}</span>
-        <span class="team-score-max">из 5.0</span>
-      </div>
-      <div class="progress-track">
-        <div class="progress-fill" style="width: ${Math.min((member.avg / 5) * 100, 100)}%"></div>
-      </div>
-    `;
-
-    grid.appendChild(card);
-  });
-}
-
 /* ---------- Рендер: лента отзывов ---------- */
 
 function renderReviewsFeed(displayRows) {
