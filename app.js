@@ -289,7 +289,16 @@ function computeStats(rows) {
   const team = Array.from(staffNames)
   .map((name) => {
     const scans = Array.isArray(allVisits)
-      ? allVisits.filter((v) => v.barista === name.toLowerCase()).length
+      ? allVisits.filter((v) => {
+          const sameBarista = v.barista === name.toLowerCase();
+
+          const sameMonth =
+            selectedMonthKey === "all" ||
+            !selectedMonthKey ||
+            v.monthKey === selectedMonthKey;
+
+          return sameBarista && sameMonth;
+        }).length
       : 0;
 
     return {
@@ -304,7 +313,12 @@ function computeStats(rows) {
   .filter((member) => member.count > 0 || member.scans > 0)
   .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
 
-  return { totalReviews, avgRating, team, best: team.length ? team[0] : null };
+return {
+  totalReviews,
+  avgRating,
+  team,
+  best: team.length ? team[0] : null
+};
 }
 
 /* ---------- Фильтрация: месяц + бариста + негатив ---------- */
