@@ -480,22 +480,37 @@ function renderHeaderStats(displayRows) {
   // Конверсия QR = (Всего отзывов / Всего сканов) * 100 — глобальная метрика кофейни,
   // не зависит от текущих фильтров, как и в бэкенде /doGet
   const conversionEl = document.getElementById('snapshot-conversion');
-  if (conversionEl) {
-    if (totalScansCount > 0) {
-      const rate = ((allRows.length / totalScansCount) * 100).toFixed(1);
-      conversionEl.textContent = `${rate}%`;
-    } else {
-      conversionEl.textContent = '—';
-    }
 
-    const conversionCard = conversionEl.closest('.snapshot-card');
-    if (conversionCard) {
-      conversionCard.setAttribute(
-        'data-tooltip',
-        `Отзывов: ${allRows.length} · Сканов: ${totalScansCount} · Соотношение оставленных отзывов к числу сканов QR-кода`
-      );
-    }
+if (conversionEl) {
+
+  const filteredScans = Array.isArray(allVisits)
+    ? allVisits.filter((v) => {
+        return (
+          selectedMonthKey === "all" ||
+          !selectedMonthKey ||
+          v.monthKey === selectedMonthKey
+        );
+      }).length
+    : 0;
+
+  const filteredReviews = getMonthRows().length;
+
+  if (filteredScans > 0) {
+    const rate = ((filteredReviews / filteredScans) * 100).toFixed(1);
+    conversionEl.textContent = `${rate}%`;
+  } else {
+    conversionEl.textContent = "—";
   }
+
+  const conversionCard = conversionEl.closest(".snapshot-card");
+
+  if (conversionCard) {
+    conversionCard.setAttribute(
+      "data-tooltip",
+      `Отзывов: ${filteredReviews} · Сканов: ${filteredScans} · Конверсия QR за выбранный период`
+    );
+  }
+}
 }
 
 /* ---------- Рендер: лучший сотрудник (по выбранному месяцу) ---------- */
