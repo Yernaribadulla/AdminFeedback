@@ -572,6 +572,38 @@ function renderTeamGrid(monthRows) {
     grid.appendChild(card);
   });
 }
+card.innerHTML = `
+  <div class="team-card-header">
+    <div class="team-avatar">${member.name.charAt(0).toUpperCase()}</div>
+    <div>
+      <div class="team-name">${member.name}</div>
+      <div class="team-count">
+        ${member.count} ${pluralizeReviews(member.count)} · ${member.scans} ${pluralizeScans(member.scans)}
+      </div>
+    </div>
+  </div>
+  <div class="team-score-row">
+    <span class="team-score-value">${member.avg ? member.avg.toFixed(1) : '0.0'}</span>
+    <span class="team-score-max">из 5.0</span>
+  </div>
+  <div class="progress-track">
+    <div class="progress-fill" style="width: ${Math.min((member.avg / 5) * 100, 100)}%"></div>
+  </div>
+`;
+
+const conversion =
+  member.scans > 0
+    ? ((member.count / member.scans) * 100).toFixed(1)
+    : "—";
+
+card.setAttribute(
+  "data-tooltip",
+  `Отзывы: ${member.count}
+Сканов: ${member.scans}
+Конверсия: ${conversion}%`
+);
+
+grid.appendChild(card);
 
 /* ---------- Рендер: лента отзывов ---------- */
 
