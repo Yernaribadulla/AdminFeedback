@@ -9,6 +9,8 @@ const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?t
 // Лист «Visits» (сканы QR) — правильный gid из архитектуры проекта
 const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=917011252`;
 
+const PLATFORM_CLICKS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=PlatformClicks`;
+
 const monthNames = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
@@ -27,6 +29,7 @@ const fallbackData = [
 
 let allRows = [];
 let allVisits = [];
+let allPlatformClicks = [];
 let totalScansCount = 0;
 
 let selectedBarista = null;
@@ -197,9 +200,11 @@ async function fetchData() {
     allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
   }
 
-  await loadScansData();
-  populateMonthSelect();
-  renderDashboard();
+await loadScansData();
+await loadPlatformClicksData();
+
+populateMonthSelect();
+renderDashboard();
 }
 
 async function loadScansData() {
@@ -245,6 +250,71 @@ async function loadScansData() {
 
     allVisits = [];
     totalScansCount = 0;
+  }
+}
+async function loadPlatformClicksData() {
+  try {
+    const response = await fetch(PLATFORM_CLICKS_URL);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const text = await response.text();
+    const json = parseGvizResponse(text);
+
+    const rows = json.table?.rows || [];
+
+    allPlatformClicks = rows
+      .map((row) => {
+        if (!row.c) return null;
+
+        const rawDate = row.c[0]?.v || row.c[0]?.f;
+        const rawBarista = row.c[1]?.v || row.c[1]?.f;
+        const rawPlatform = row.c[2]?.v || row.c[2]?.f;
+
+        if (!rawDate || !rawBarista || !rawPlatform) {
+          return null;
+        }
+
+        const barista = String(rawBarista).trim().toLowerCase();
+        const platform = String(rawPlatform).trim().toLowerCase();
+
+        // Игнорируем тестовые unknown
+        if (barista === 'unknown') {
+          return null;
+        }
+
+        // Берём только наши три платформы
+        if (!['2gis', 'yandex', 'instagram'].includes(platform)) {
+          return null;
+        }
+
+        const dateObj = parseDateSafe(rawDate);
+
+        return {
+          dateObj,
+          monthKey: `${dateObj.getFullYear()}-${String(
+            dateObj.getMonth() + 1
+          ).padStart(2, '0')}`,
+          barista,
+          platform
+        };
+      })
+      .filter(Boolean);
+
+    console.log(
+      '✅ PlatformClicks загружен:',
+      allPlatformClicks
+    );
+
+  } catch (err) {
+    console.error(
+      '❌ Ошибка загрузки PlatformClicks:',
+      err
+    );
+
+    allPlatformClicks = [];
   }
 }
 
@@ -546,6 +616,31 @@ function renderTeamGrid(monthRows) {
   grid.innerHTML = '';
 
   stats.team.forEach((member) => {
+    const platformClicks = allPlatformClicks.filter((click) => {
+  const sameBarista =
+    click.barista === member.name.toLowerCase();
+
+  const sameMonth =
+    selectedMonthKey === 'all' ||
+    !selectedMonthKey ||
+    click.monthKey === selectedMonthKey;
+
+  return sameBarista && sameMonth;
+});
+
+const clicks2gis = platformClicks.filter(
+  (c) => c.platform === '2gis'
+).length;
+
+const clicksYandex = platformClicks.filter(
+  (c) => c.platform === 'yandex'
+).length;
+
+const clicksInstagram = platformClicks.filter(
+  (c) => c.platform === 'instagram'
+).length;
+
+const totalClicks = platformClicks.length;
     const card = document.createElement('button');
     card.type = 'button';
     card.className =
@@ -554,6 +649,19 @@ function renderTeamGrid(monthRows) {
     card.onclick = () => selectBarista(member.name);
 
     card.innerHTML = `
+    <div class="team-platforms">
+  <span class="platform-stat">
+    2ГИС <b>${clicks2gis}</b>
+  </span>
+
+  <span class="platform-stat">
+    Яндекс <b>${clicksYandex}</b>
+  </span>
+
+  <span class="platform-stat">
+    Instagram <b>${clicksInstagram}</b>
+  </span>
+</div>
       <div class="team-card-header">
         <div class="team-avatar">${member.name.charAt(0).toUpperCase()}</div>
         <div>
