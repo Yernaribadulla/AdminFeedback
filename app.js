@@ -35,6 +35,7 @@ let totalScansCount = 0;
 let selectedBarista = null;
 let onlyNegative = false;
 let selectedMonthKey = 'all';
+let selectedPlatform = 'all';
 
 /* ---------- Парсинг ответа Google Sheets ---------- */
 
@@ -606,8 +607,6 @@ function renderBestEmployee(monthRows) {
 
 /* ---------- Рендер: карточки команды (по выбранному месяцу) ---------- */
 
-
-
 function renderTeamGrid(monthRows) {
   const stats = computeStats(monthRows);
   const grid = document.getElementById('team-grid');
@@ -617,30 +616,19 @@ function renderTeamGrid(monthRows) {
 
   stats.team.forEach((member) => {
     const platformClicks = allPlatformClicks.filter((click) => {
-  const sameBarista =
-    click.barista === member.name.toLowerCase();
+      const sameBarista = click.barista === member.name.toLowerCase();
+      const sameMonth =
+        selectedMonthKey === 'all' ||
+        !selectedMonthKey ||
+        click.monthKey === selectedMonthKey;
 
-  const sameMonth =
-    selectedMonthKey === 'all' ||
-    !selectedMonthKey ||
-    click.monthKey === selectedMonthKey;
+      return sameBarista && sameMonth;
+    });
 
-  return sameBarista && sameMonth;
-});
+    const clicks2gis = platformClicks.filter((c) => c.platform === '2gis').length;
+    const clicksYandex = platformClicks.filter((c) => c.platform === 'yandex').length;
+    const clicksInstagram = platformClicks.filter((c) => c.platform === 'instagram').length;
 
-const clicks2gis = platformClicks.filter(
-  (c) => c.platform === '2gis'
-).length;
-
-const clicksYandex = platformClicks.filter(
-  (c) => c.platform === 'yandex'
-).length;
-
-const clicksInstagram = platformClicks.filter(
-  (c) => c.platform === 'instagram'
-).length;
-
-const totalClicks = platformClicks.length;
     const card = document.createElement('button');
     card.type = 'button';
     card.className =
@@ -649,26 +637,18 @@ const totalClicks = platformClicks.length;
     card.onclick = () => selectBarista(member.name);
 
     card.innerHTML = `
-    <div class="team-platforms">
-  <span class="platform-stat">
-    2ГИС <b>${clicks2gis}</b>
-  </span>
+      <div class="team-platforms-row">
+        <span class="platform-chip chip-2gis">2ГИС <b>${clicks2gis}</b></span>
+        <span class="platform-chip chip-yandex">Яндекс <b>${clicksYandex}</b></span>
+        <span class="platform-chip chip-insta">Inst <b>${clicksInstagram}</b></span>
+      </div>
 
-  <span class="platform-stat">
-    Яндекс <b>${clicksYandex}</b>
-  </span>
-
-  <span class="platform-stat">
-    Instagram <b>${clicksInstagram}</b>
-  </span>
-</div>
       <div class="team-card-header">
         <div class="team-avatar">${member.name.charAt(0).toUpperCase()}</div>
-        <div>
+        <div class="team-user-info">
           <div class="team-name">${member.name}</div>
           <div class="team-count">
-            ${member.count} ${pluralizeReviews(member.count)} ·
-            ${member.scans} ${pluralizeScans(member.scans)}
+            ${member.count} ${pluralizeReviews(member.count)} · ${member.scans} ${pluralizeScans(member.scans)}
           </div>
         </div>
       </div>
@@ -681,9 +661,7 @@ const totalClicks = platformClicks.length;
       </div>
 
       <div class="progress-track">
-        <div class="progress-fill"
-             style="width: ${Math.min((member.avg / 5) * 100, 100)}%">
-        </div>
+        <div class="progress-fill" style="width: ${Math.min((member.avg / 5) * 100, 100)}%"></div>
       </div>
     `;
 
@@ -694,14 +672,77 @@ const totalClicks = platformClicks.length;
 
     card.setAttribute(
       'data-tooltip',
-      `Отзывы: ${member.count}
-Сканов: ${member.scans}
-Конверсия: ${conversion}%`
+      `Отзывы: ${member.count}\nСканов: ${member.scans}\nКонверсия: ${conversion}%`
     );
 
     grid.appendChild(card);
   });
 }
+
+/* ---------- Рендер: статистика по платформам ---------- */
+
+function renderPlatformStats() {
+  const grid = document.getElementById('platform-stats-grid');
+  if (!grid) return;
+
+  const filtered =
+    selectedPlatform === 'all'
+      ? allPlatformClicks
+      : allPlatformClicks.filter((row) => row.platform === selectedPlatform);
+
+  const platforms = [
+    { id: '2gis', name: '2ГИС', badgeClass: 'chip-2gis' },
+    { id: 'yandex', name: 'Яндекс', badgeClass: 'chip-yandex' },
+    { id: 'instagram', name: 'Instagram', badgeClass: 'chip-insta' }
+  ];
+
+  grid.innerHTML = '';
+
+  platforms.forEach((platform) => {
+    const clicks = filtered.filter((row) => row.platform === platform.id);
+    const total = clicks.length;
+    const baristas = {};
+
+    clicks.forEach((row) => {
+      const name = String(row.barista || '').trim();
+      if (!name || name === 'unknown') return;
+      baristas[name] = (baristas[name] || 0) + 1;
+    });
+
+    const sortedBaristas = Object.entries(baristas).sort((a, b) => b[1] - a[1]);
+
+    const card = document.createElement('div');
+    card.className = 'platform-stat-card';
+
+    card.innerHTML = `
+      <div class="platform-stat-header">
+        <span class="platform-chip ${platform.badgeClass}">${platform.name}</span>
+        <div class="platform-stat-total">
+          ${total} ${total === 1 ? 'переход' : 'переходов'}
+        </div>
+      </div>
+
+      <div class="platform-stat-baristas">
+        ${
+          sortedBaristas.length
+            ? sortedBaristas
+                .map(
+                  ([name, count]) => `
+                <div class="platform-barista-row">
+                  <span class="platform-barista-name">${name}</span>
+                  <span class="platform-barista-count">${count}</span>
+                </div>
+              `
+                )
+                .join('')
+            : `<div class="platform-empty">Нет данных</div>`
+        }
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+} 
 /* ---------- Рендер: лента отзывов ---------- */
 
 function renderReviewsFeed(displayRows) {
@@ -767,12 +808,14 @@ function renderDashboard() {
   renderHeaderStats(displayRows);
   renderReviewsFeed(displayRows);
   renderFilterButtons();
-}
 
+  renderPlatformStats();
+}
 /* ---------- Инициализация ---------- */
 
 document.addEventListener('DOMContentLoaded', () => {
   const resetBtn = document.getElementById('reset-filter-btn');
+
   if (resetBtn) {
     resetBtn.addEventListener('click', () => {
       selectedBarista = null;
@@ -781,6 +824,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const negativeBtn = document.getElementById('negative-filter-btn');
+
   if (negativeBtn) {
     negativeBtn.addEventListener('click', () => {
       onlyNegative = !onlyNegative;
@@ -789,6 +833,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const monthSelect = document.getElementById('month-select');
+
   if (monthSelect) {
     monthSelect.addEventListener('change', (event) => {
       selectedMonthKey = event.target.value;
@@ -796,5 +841,126 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // ---------- Фильтр платформ ----------
+
+  document
+    .querySelectorAll('.platform-filter-btn')
+    .forEach((button) => {
+
+      button.addEventListener('click', () => {
+        selectedPlatform =
+          button.dataset.platformFilter || 'all';
+
+        document
+          .querySelectorAll('.platform-filter-btn')
+          .forEach((btn) => {
+            btn.classList.toggle(
+              'is-active',
+              btn === button
+            );
+          });
+
+        renderPlatformStats();
+      });
+
+    });
+
   fetchData();
 });
+function renderPlatformStats() {
+  const grid = document.getElementById('platform-stats-grid');
+  if (!grid) return;
+
+  const filtered =
+    selectedPlatform === 'all'
+      ? allPlatformClicks
+      : allPlatformClicks.filter(
+          row => row.platform === selectedPlatform
+        );
+
+  const platforms = [
+    {
+      id: '2gis',
+      name: '2ГИС',
+      icon: '📍'
+    },
+    {
+      id: 'yandex',
+      name: 'Яндекс',
+      icon: '🔴'
+    },
+    {
+      id: 'instagram',
+      name: 'Instagram',
+      icon: '◎'
+    }
+  ];
+
+  grid.innerHTML = '';
+
+  platforms.forEach((platform) => {
+    const clicks = filtered.filter(
+      row => row.platform === platform.id
+    );
+
+    const total = clicks.length;
+
+    const baristas = {};
+
+    clicks.forEach((row) => {
+      const name = String(row.barista || '').trim();
+
+      if (!name || name === 'unknown') return;
+
+      baristas[name] = (baristas[name] || 0) + 1;
+    });
+
+    const sortedBaristas = Object.entries(baristas)
+      .sort((a, b) => b[1] - a[1]);
+
+    const card = document.createElement('div');
+    card.className = 'platform-stat-card';
+
+    card.innerHTML = `
+      <div class="platform-stat-header">
+        <div class="platform-stat-icon">
+          ${platform.icon}
+        </div>
+
+        <div class="platform-stat-info">
+          <div class="platform-stat-name">
+            ${platform.name}
+          </div>
+
+          <div class="platform-stat-total">
+            ${total} ${total === 1 ? 'переход' : 'переходов'}
+          </div>
+        </div>
+      </div>
+
+      <div class="platform-stat-baristas">
+        ${
+          sortedBaristas.length
+            ? sortedBaristas.map(([name, count]) => `
+                <div class="platform-barista-row">
+                  <span class="platform-barista-name">
+                    ${name}
+                  </span>
+
+                  <span class="platform-barista-count">
+                    ${count}
+                  </span>
+                </div>
+              `).join('')
+            : `
+              <div class="platform-empty">
+                Нет данных
+              </div>
+            `
+        }
+      </div>
+    `;
+
+    grid.appendChild(card);
+  });
+}
