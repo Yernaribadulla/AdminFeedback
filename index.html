@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -143,3 +144,595 @@
 <script src="app.js"></script>
 </body>
 </html>
+=======
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Штиль · Команда</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
+    rel="stylesheet"
+  >
+
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div class="app-shell">
+
+  <!-- =========================
+       SIDEBAR
+  ========================== -->
+
+  <aside class="sidebar">
+
+    <div class="sidebar-brand">
+      <div class="brand-mark">Ш</div>
+
+      <div class="brand-copy">
+        <strong>Штиль</strong>
+        <span>Кофейня · Актау</span>
+      </div>
+    </div>
+
+    <nav class="main-nav">
+
+      <div class="nav-caption">
+        Рабочее пространство
+      </div>
+
+      <a href="#overview" class="nav-item is-active">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24">
+            <rect x="4" y="4" width="6" height="6" rx="1"/>
+            <rect x="14" y="4" width="6" height="6" rx="1"/>
+            <rect x="4" y="14" width="6" height="6" rx="1"/>
+            <rect x="14" y="14" width="6" height="6" rx="1"/>
+          </svg>
+        </span>
+
+        Обзор
+      </a>
+
+      <a href="#team" class="nav-item">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24">
+            <circle cx="9" cy="8" r="3"/>
+            <circle cx="17" cy="9" r="2.5"/>
+            <path d="M3.5 19c.6-3.1 2.4-5 5.5-5s4.9 1.9 5.5 5"/>
+            <path d="M14 15c2.6-.5 5.2.9 6 4"/>
+          </svg>
+        </span>
+
+        Команда
+      </a>
+
+      <a href="#reviews" class="nav-item">
+        <span class="nav-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 5.5h14v10H9l-4 3v-13z"/>
+            <path d="M8 9h8"/>
+            <path d="M8 12h5"/>
+          </svg>
+        </span>
+
+        Отзывы
+      </a>
+
+    </nav>
+
+    <div class="sidebar-bottom">
+
+      <div class="sidebar-status">
+        <span class="status-dot"></span>
+
+        <div>
+          <strong>Данные обновлены</strong>
+          <span>Система работает</span>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <span>Штиль</span>
+        <span>2026</span>
+      </div>
+
+    </div>
+
+  </aside>
+
+
+  <!-- =========================
+       MAIN
+  ========================== -->
+
+  <main class="main-content">
+
+    <!-- TOP BAR -->
+
+    <header class="topbar">
+
+      <div class="mobile-brand">
+        <div class="brand-mark">Ш</div>
+
+        <div>
+          <strong>Штиль</strong>
+          <span>Команда</span>
+        </div>
+      </div>
+
+      <div class="topbar-context">
+
+        <span class="topbar-kicker">
+          Управление сервисом
+        </span>
+
+        <h1>
+          Команда
+        </h1>
+
+      </div>
+
+      <div class="topbar-actions">
+
+        <div class="period-control">
+
+          <label for="month-select">
+            Период
+          </label>
+
+          <select id="month-select" class="month-select">
+            <option value="all">Все время</option>
+          </select>
+
+        </div>
+
+        <button class="profile-button" type="button">
+          <span>Ш</span>
+        </button>
+
+      </div>
+
+    </header>
+
+
+    <!-- =========================
+         OVERVIEW
+    ========================== -->
+
+    <section class="overview-section" id="overview">
+
+      <div class="overview-heading">
+
+        <div>
+          <span class="section-kicker">
+            Обзор
+          </span>
+
+          <h2>
+            Как чувствует себя команда
+          </h2>
+
+          <p>
+            Ключевые показатели сервиса и обратной связи гостей.
+          </p>
+        </div>
+
+      </div>
+
+
+      <!-- MAIN PERFORMANCE -->
+
+      <div class="performance-layout">
+
+        <article class="rating-panel">
+
+          <div class="rating-panel-top">
+
+            <div>
+              <span class="metric-label">
+                Средний рейтинг
+              </span>
+
+              <div class="rating-value-row">
+
+                <strong
+                  class="rating-value"
+                  id="stat-avg-rating"
+                >
+                  —
+                </strong>
+
+                <span class="rating-star">
+                  ★
+                </span>
+
+              </div>
+
+              <span class="rating-description">
+                По всем полученным отзывам
+              </span>
+            </div>
+
+            <div class="rating-badge">
+              <span>Сервис</span>
+              <strong>★★★★★</strong>
+            </div>
+
+          </div>
+
+
+          <div class="rating-divider"></div>
+
+
+          <div class="rating-footer">
+
+            <div class="rating-stat">
+              <span>Всего отзывов</span>
+
+              <strong id="stat-total-reviews">
+                —
+              </strong>
+            </div>
+
+            <div class="rating-stat">
+              <span>За неделю</span>
+
+              <strong id="snapshot-week-rating">
+                —
+              </strong>
+            </div>
+
+            <div class="rating-stat">
+              <span>Сегодня</span>
+
+              <strong id="snapshot-negative-title">
+                —
+              </strong>
+            </div>
+
+          </div>
+
+        </article>
+
+
+        <!-- QUICK HEALTH -->
+
+        <div class="health-panel">
+
+          <div class="health-header">
+
+            <div>
+              <span class="metric-label">
+                Состояние
+              </span>
+
+              <h3>
+                Сервис сегодня
+              </h3>
+            </div>
+
+            <span class="health-indicator">
+              <span></span>
+              стабильно
+            </span>
+
+          </div>
+
+
+          <div class="health-list">
+
+            <div class="health-row">
+
+              <div class="health-icon negative">
+                !
+              </div>
+
+              <div class="health-copy">
+                <strong>Негативные отзывы</strong>
+                <span>3 звезды и ниже</span>
+              </div>
+
+              <strong
+                class="health-value"
+                id="snapshot-negative-title"
+              >
+                —
+              </strong>
+
+            </div>
+
+
+            <div class="health-row">
+
+              <div class="health-icon positive">
+                ↗
+              </div>
+
+              <div class="health-copy">
+                <strong>Конверсия QR</strong>
+                <span>Отзывы от сканов</span>
+              </div>
+
+              <strong
+                class="health-value"
+                id="snapshot-conversion"
+              >
+                —
+              </strong>
+
+            </div>
+
+
+            <div class="health-row">
+
+              <div class="health-icon leader">
+                ★
+              </div>
+
+              <div class="health-copy">
+                <strong>Лидер недели</strong>
+                <span>Лучший результат</span>
+              </div>
+
+              <strong
+                class="health-value health-name"
+                id="snapshot-week-leader"
+              >
+                —
+              </strong>
+
+            </div>
+
+
+            <div class="health-row">
+
+              <div
+                class="health-icon trend"
+                id="snapshot-trend-icon"
+              >
+                ↑
+              </div>
+
+              <div class="health-copy">
+                <strong>Тренд команды</strong>
+                <span>Изменение рейтинга</span>
+              </div>
+
+              <strong
+                class="health-value health-name"
+                id="snapshot-trend-title"
+              >
+                —
+              </strong>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =========================
+         BEST EMPLOYEE
+    ========================== -->
+
+    <section class="leader-section">
+
+      <div class="leader-copy">
+
+        <span class="section-kicker">
+          Лучший результат
+        </span>
+
+        <h2>
+          Сотрудник месяца
+        </h2>
+
+        <p>
+          Лидер определяется по качеству отзывов и стабильности результата.
+        </p>
+
+      </div>
+
+
+      <article
+        class="leader-card"
+        id="best-employee"
+      >
+
+        <div class="leader-avatar">
+          <span id="best-name-avatar">
+            ★
+          </span>
+        </div>
+
+        <div class="leader-main">
+
+          <span class="leader-label">
+            Лучший сотрудник
+          </span>
+
+          <h3 id="best-name">
+            —
+          </h3>
+
+          <div class="leader-score">
+
+            <strong id="best-score">
+              —
+            </strong>
+
+            <span>
+              средний рейтинг
+            </span>
+
+          </div>
+
+        </div>
+
+        <div class="leader-trophy">
+
+          <svg viewBox="0 0 24 24">
+            <path d="M8 4h8v3a4 4 0 0 1-4 4 4 4 0 0 1-4-4V4z"/>
+            <path d="M8 5H5a3 3 0 0 0 3 5"/>
+            <path d="M16 5h3a3 3 0 0 1-3 5"/>
+            <path d="M12 11v3"/>
+            <path d="M9 20h6"/>
+            <path d="M10 17h4v3h-4z"/>
+          </svg>
+
+        </div>
+
+      </article>
+
+    </section>
+
+
+    <!-- =========================
+         TEAM
+    ========================== -->
+
+    <section
+      class="team-section"
+      id="team"
+    >
+
+      <div class="section-toolbar">
+
+        <div class="section-toolbar-copy">
+
+          <span class="section-kicker">
+            Команда
+          </span>
+
+          <h2>
+            Люди и результаты
+          </h2>
+
+        </div>
+
+
+        <div class="team-filters">
+
+          
+
+          <button
+            type="button"
+            class="filter-btn warning-btn"
+            id="negative-filter-btn"
+          >
+            <svg viewBox="0 0 24 24">
+              <path d="M12 3.5L21 19H3z"/>
+              <path d="M12 9.5v4.2"/>
+              <circle
+                cx="12"
+                cy="16.6"
+                r="0.6"
+                fill="currentColor"
+                stroke="none"
+              />
+            </svg>
+
+            Только негативные
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <div
+        class="team-grid"
+        id="team-grid"
+      >
+
+        <div class="state-placeholder">
+          Загрузка данных команды…
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =========================
+         REVIEWS
+    ========================== -->
+
+    <section
+      class="reviews-section"
+      id="reviews"
+    >
+
+      <div class="reviews-header">
+
+        <div>
+
+          <span class="section-kicker">
+            Обратная связь
+          </span>
+
+          <h2 id="reviews-title">
+            Что говорят гости
+          </h2>
+
+        </div>
+
+        <span class="reviews-count">
+          Последние отзывы
+        </span>
+
+      </div>
+
+
+      <div
+        class="reviews-feed"
+        id="reviews-feed"
+      >
+
+        <div class="state-placeholder">
+          Загрузка отзывов…
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer class="main-footer">
+
+      <span>
+        Штиль · Аналитика команды
+      </span>
+
+      <span>
+        Данные используются для внутреннего анализа сервиса
+      </span>
+
+    </footer>
+
+  </main>
+
+</div>
+
+
+<script src="app.js"></script>
+
+</body>
+</html>
+>>>>>>> 2b27985 (Initial commit)
