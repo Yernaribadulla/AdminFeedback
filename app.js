@@ -1,22 +1,23 @@
 /* ============================================================
    ШТИЛЬ · AdminFeedBack — Дашборд команды
-   Источник данных: Google Sheets (GViz JSON)
    ============================================================ */
 
 const sheetId = '1ZS1EXykP93modWYpw0_6CXXpk3NIe7e9-VkTSdSFZVE';
 
-const REVIEWS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
-// Лист «Visits» (сканы QR) — правильный gid из архитектуры проекта
-const SCANS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=917011252`;
+const REVIEWS_URL =
+  `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=0`;
 
-const PLATFORM_CLICKS_URL = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=PlatformClicks`;
+const SCANS_URL =
+  `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&gid=917011252`;
+
+const PLATFORM_CLICKS_URL =
+  `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=PlatformClicks`;
 
 const monthNames = [
   'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
 ];
 
-// Показывается только если запрос отзывов провалился — сеть недоступна и т.п.
 const fallbackData = [
   { date: '2026-07-20', barista: 'dias', rating: 5, comment: 'Отличный кофе и сервис!' },
   { date: '2026-07-21', barista: 'islam', rating: 4, comment: 'Всё круто, но долго делали' },
@@ -25,19 +26,29 @@ const fallbackData = [
   { date: '2026-07-23', barista: 'dias', rating: 5, comment: 'Супер!' }
 ];
 
-/* ---------- Единое состояние дашборда ---------- */
+/* ============================================================
+   STATE
+   ============================================================ */
 
 let allRows = [];
 let allVisits = [];
 let allPlatformClicks = [];
-let totalScansCount = 0;
 
+let totalScansCount = 0;
 let selectedBarista = null;
 let onlyNegative = false;
 let selectedMonthKey = 'all';
 let selectedPlatform = 'all';
 
-/* ---------- Парсинг ответа Google Sheets ---------- */
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+function clampRating(value) {
+  value = Number(value);
+  if (Number.isNaN(value)) return 0;
+  return Math.max(0, Math.min(5, value));
+}
 
 function parseGvizResponse(text) {
   const match = text.match(/setResponse\(([\s\S]*)\);?\s*$/);
@@ -45,198 +56,234 @@ function parseGvizResponse(text) {
   return JSON.parse(match[1]);
 }
 
-/**
- * Надёжный парсер оценки. Формат из Apps Script:
- * "⭐ ⭐ ⭐ ⭐ ⭐ (5/5)" или "⭐ ⭐ ✰ ✰ ✰ (2/5)".
- * Порядок попыток:
- *   1) число уже пришло как чистое число (ручные правки в таблице),
- *   2) число в скобках "(N/5)" через регулярку \((\d+)\/5\) — основной, надёжный маркер,
- *   3) подсчёт закрашенных звёзд ⭐, если скобок вдруг нет,
- *   4) первое число в строке как последний фоллбэк.
- * Всегда строго кастуется в Number и ограничивается диапазоном 0–5.
- */
-function parseRatingValue(rawValue) {
-  if (rawValue === null || rawValue === undefined) return 0;
+function parseRatingValue(value) {
+  if (value == null) return 0;
 
-  if (typeof rawValue === 'number' && !Number.isNaN(rawValue)) {
-    return clampRating(rawValue);
+  if (typeof value === 'number') {
+    return clampRating(value);
   }
 
-  const str = String(rawValue).trim();
+  const str = String(value).trim();
   if (!str) return 0;
 
-  const bracketMatch = str.match(/\((\d+)\/5\)/);
-  if (bracketMatch) {
-    return clampRating(Number(bracketMatch[1]));
-  }
+  const bracket = str.match(/\((\d+)\/5\)/);
+  if (bracket) return clampRating(bracket[1]);
 
-  const filledStars = (str.match(/⭐/g) || []).length;
-  if (filledStars > 0) {
-    return clampRating(filledStars);
-  }
+  const stars = (str.match(/⭐/g) || []).length;
+  if (stars) return clampRating(stars);
 
-  const digitMatch = str.match(/\d+(\.\d+)?/);
-  if (digitMatch) {
-    return clampRating(Number(digitMatch[0]));
-  }
-
-  return 0;
+  const number = str.match(/\d+(\.\d+)?/);
+  return number ? clampRating(number[0]) : 0;
 }
 
-function clampRating(value) {
-  if (Number.isNaN(value)) return 0;
-  if (value > 5) return 5;
-  if (value < 0) return 0;
-  return value;
-}
+function parseDateSafe(value) {
+  if (!value) return new Date();
 
-/**
- * Падение-устойчивый парсер даты. Поддерживает:
- * - объект gviz: Date(2026,6,19,1,8,32)
- * - "19.07.2026, 1:08:32" (с запятой перед временем — так пишет Apps Script)
- * - "19.07.2026 1:08:32" (без запятой)
- * - ISO-строки
- * Никогда не возвращает null — при полном провале отдаёт new Date().
- */
-function parseDateSafe(rawValue) {
-  if (!rawValue) return new Date();
-  const value = String(rawValue).trim();
+  const str = String(value).trim();
 
-  const gvizMatch = /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)?/.exec(value);
-  if (gvizMatch) {
+  const gviz = str.match(
+    /^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)?/
+  );
+
+  if (gviz) {
     return new Date(
-      Number(gvizMatch[1]),
-      Number(gvizMatch[2]),
-      Number(gvizMatch[3]),
-      Number(gvizMatch[4] || 0),
-      Number(gvizMatch[5] || 0),
-      Number(gvizMatch[6] || 0)
+      +gviz[1],
+      +gviz[2],
+      +gviz[3],
+      +(gviz[4] || 0),
+      +(gviz[5] || 0),
+      +(gviz[6] || 0)
     );
   }
 
-  const dottedMatch = /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,?\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/.exec(value);
-  if (dottedMatch) {
+  const dotted = str.match(
+    /^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:,?\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/
+  );
+
+  if (dotted) {
     return new Date(
-      Number(dottedMatch[3]),
-      Number(dottedMatch[2]) - 1,
-      Number(dottedMatch[1]),
-      Number(dottedMatch[4] || 0),
-      Number(dottedMatch[5] || 0),
-      Number(dottedMatch[6] || 0)
+      +dotted[3],
+      +dotted[2] - 1,
+      +dotted[1],
+      +(dotted[4] || 0),
+      +(dotted[5] || 0),
+      +(dotted[6] || 0)
     );
   }
 
-  const parsed = new Date(value);
-  return !Number.isNaN(parsed.getTime()) ? parsed : new Date();
+  const parsed = new Date(str);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
 }
 
-function buildRow(rawDate, barista, rating, comment) {
-  const dateObj = parseDateSafe(rawDate);
+function buildRow(date, barista, rating, comment) {
+  const dateObj = parseDateSafe(date);
   const year = dateObj.getFullYear();
   const month = dateObj.getMonth() + 1;
 
   return {
     dateObj,
     monthKey: `${year}-${String(month).padStart(2, '0')}`,
-    dateLabel: dateObj.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+    dateLabel: dateObj.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }),
     barista: String(barista).trim(),
-    rating: clampRating(Number(rating) || 0),
+    rating: clampRating(rating),
     comment: String(comment || '')
   };
 }
 
-/* ---------- Железобетонный парсер строк листа «Все отзывы» ---------- */
+function pluralizeReviews(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
 
-function extractRows(json) {
-  const rows = json.table && json.table.rows ? json.table.rows : [];
+  if (mod10 === 1 && mod100 !== 11) return 'отзыв';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) {
+    return 'отзыва';
+  }
 
-  return rows
-    .map((row) => {
-      if (!row.c) return null;
-      const cells = row.c;
-
-      const rawDate = cells[0] ? (cells[0].v || cells[0].f) : null;
-      const barista = cells[1] && cells[1].v !== null && cells[1].v !== undefined ? cells[1].v : '';
-
-      // Оценка: сначала .v (обычно строка со звёздами), затем .f как фоллбэк
-      let rawRating = null;
-      if (cells[2]) {
-        rawRating = cells[2].v !== null && cells[2].v !== undefined ? cells[2].v : cells[2].f;
-      }
-      const rating = parseRatingValue(rawRating);
-
-      const comment = cells[3] && cells[3].v !== null && cells[3].v !== undefined ? cells[3].v : '';
-
-      if (!barista) return null;
-      return buildRow(rawDate, barista, rating, comment);
-    })
-    .filter((r) => r !== null && r.rating > 0);
+  return 'отзывов';
 }
 
-/* ---------- Загрузка данных ---------- */
+function pluralizeScans(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+
+  if (mod10 === 1 && mod100 !== 11) return 'скан';
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) {
+    return 'скана';
+  }
+
+  return 'сканов';
+}
+
+function daysBetween(a, b) {
+  const day = date =>
+    new Date(a.getFullYear(), a.getMonth(), a.getDate());
+
+  const startA = new Date(
+    a.getFullYear(),
+    a.getMonth(),
+    a.getDate()
+  );
+
+  const startB = new Date(
+    b.getFullYear(),
+    b.getMonth(),
+    b.getDate()
+  );
+
+  return Math.round((startA - startB) / 86400000);
+}
+
+function formatName(name) {
+  return String(name || '')
+    .trim()
+    .toLocaleLowerCase('ru-RU')
+    .replace(/(^|\s|-)(\S)/g, (_, prefix, char) =>
+      prefix + char.toLocaleUpperCase('ru-RU')
+    );
+}
+
+/* ============================================================
+   REVIEWS
+   ============================================================ */
+
+function extractRows(json) {
+  return (json.table?.rows || [])
+    .map(row => {
+      if (!row.c) return null;
+
+      const cells = row.c;
+
+      const rawDate = cells[0]?.v ?? cells[0]?.f;
+      const barista = cells[1]?.v ?? '';
+
+      const rawRating =
+        cells[2]?.v !== null && cells[2]?.v !== undefined
+          ? cells[2].v
+          : cells[2]?.f;
+
+      const comment = cells[3]?.v ?? '';
+      const rating = parseRatingValue(rawRating);
+
+      if (!barista || !rating) return null;
+
+      return buildRow(rawDate, barista, rating, comment);
+    })
+    .filter(Boolean);
+}
+
+/* ============================================================
+   LOAD DATA
+   ============================================================ */
 
 async function fetchData() {
-  const directUrl = REVIEWS_URL;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(REVIEWS_URL)}`;
+  const proxy =
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(REVIEWS_URL)}`;
 
   try {
     console.log('🔄 Загрузка отзывов...');
-    let response = await fetch(directUrl);
+
+    let response = await fetch(REVIEWS_URL);
 
     if (!response.ok) {
-      response = await fetch(proxyUrl);
+      response = await fetch(proxy);
     }
-    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-
-    const text = await response.text();
-    const json = parseGvizResponse(text);
-    const rows = extractRows(json);
-
-    if (!rows.length) throw new Error('Таблица пуста или все строки без валидной оценки');
-
-    console.log('✅ Загружено отзывов:', rows.length);
-    allRows = rows;
-  } catch (error) {
-    console.error('❌ Ошибка загрузки отзывов, включаем фоллбэк:', error);
-    allRows = fallbackData.map((row) => buildRow(row.date, row.barista, row.rating, row.comment));
-  }
-
-await loadScansData();
-await loadPlatformClicksData();
-
-populateMonthSelect();
-renderDashboard();
-}
-
-async function loadScansData() {
-  try {
-    const response = await fetch(SCANS_URL);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
 
-    const text = await response.text();
-    const json = parseGvizResponse(text);
+    const rows = extractRows(
+      parseGvizResponse(await response.text())
+    );
 
-    const rows = json.table?.rows || [];
+    if (!rows.length) {
+      throw new Error('Таблица пуста или нет валидных оценок');
+    }
 
-    allVisits = rows
-      .map((row) => {
-        if (!row.c) return null;
+    allRows = rows;
+    console.log('✅ Загружено отзывов:', rows.length);
 
-        const rawDate = row.c[0]?.v || row.c[0]?.f;
-        const rawBarista = row.c[1]?.v || row.c[1]?.f;
+  } catch (error) {
+    console.error('❌ Ошибка отзывов:', error);
+
+    allRows = fallbackData.map(row =>
+      buildRow(row.date, row.barista, row.rating, row.comment)
+    );
+  }
+
+  await Promise.all([
+    loadScansData(),
+    loadPlatformClicksData()
+  ]);
+
+  populateMonthSelect();
+  renderDashboard();
+}
+
+async function loadScansData() {
+  try {
+    const response = await fetch(SCANS_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const json = parseGvizResponse(await response.text());
+
+    allVisits = (json.table?.rows || [])
+      .map(row => {
+        const rawDate = row.c?.[0]?.v ?? row.c?.[0]?.f;
+        const rawBarista = row.c?.[1]?.v ?? row.c?.[1]?.f;
 
         if (!rawDate || !rawBarista) return null;
 
         const dateObj = parseDateSafe(rawDate);
 
-        if (!dateObj) return null;
-
         return {
           dateObj,
-          monthKey: `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, "0")}`,
+          monthKey:
+            `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`,
           barista: String(rawBarista).trim().toLowerCase()
         };
       })
@@ -244,50 +291,37 @@ async function loadScansData() {
 
     totalScansCount = allVisits.length;
 
-    console.log("Visits:", allVisits);
+    console.log('Visits:', allVisits);
 
-  } catch (err) {
-    console.error(err);
-
+  } catch (error) {
+    console.error('❌ Ошибка Visits:', error);
     allVisits = [];
     totalScansCount = 0;
   }
 }
+
 async function loadPlatformClicksData() {
   try {
     const response = await fetch(PLATFORM_CLICKS_URL);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    const json = parseGvizResponse(await response.text());
 
-    const text = await response.text();
-    const json = parseGvizResponse(text);
+    allPlatformClicks = (json.table?.rows || [])
+      .map(row => {
+        const rawDate = row.c?.[0]?.v ?? row.c?.[0]?.f;
+        const rawBarista = row.c?.[1]?.v ?? row.c?.[1]?.f;
+        const rawPlatform = row.c?.[2]?.v ?? row.c?.[2]?.f;
 
-    const rows = json.table?.rows || [];
-
-    allPlatformClicks = rows
-      .map((row) => {
-        if (!row.c) return null;
-
-        const rawDate = row.c[0]?.v || row.c[0]?.f;
-        const rawBarista = row.c[1]?.v || row.c[1]?.f;
-        const rawPlatform = row.c[2]?.v || row.c[2]?.f;
-
-        if (!rawDate || !rawBarista || !rawPlatform) {
-          return null;
-        }
+        if (!rawDate || !rawBarista || !rawPlatform) return null;
 
         const barista = String(rawBarista).trim().toLowerCase();
         const platform = String(rawPlatform).trim().toLowerCase();
 
-        // Игнорируем тестовые unknown
-        if (barista === 'unknown') {
-          return null;
-        }
-
-        // Берём только наши три платформы
-        if (!['2gis', 'yandex', 'instagram'].includes(platform)) {
+        if (
+          barista === 'unknown' ||
+          !['2gis', 'yandex', 'instagram'].includes(platform)
+        ) {
           return null;
         }
 
@@ -295,581 +329,511 @@ async function loadPlatformClicksData() {
 
         return {
           dateObj,
-          monthKey: `${dateObj.getFullYear()}-${String(
-            dateObj.getMonth() + 1
-          ).padStart(2, '0')}`,
+          monthKey:
+            `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}`,
           barista,
           platform
         };
       })
       .filter(Boolean);
 
-    console.log(
-      '✅ PlatformClicks загружен:',
-      allPlatformClicks
-    );
+    console.log('✅ PlatformClicks:', allPlatformClicks);
 
-  } catch (err) {
-    console.error(
-      '❌ Ошибка загрузки PlatformClicks:',
-      err
-    );
-
+  } catch (error) {
+    console.error('❌ Ошибка PlatformClicks:', error);
     allPlatformClicks = [];
   }
 }
 
-function pluralizeReviews(count) {
-  const mod10 = count % 10;
-  const mod100 = count % 100;
-  if (mod10 === 1 && mod100 !== 11) return 'отзыв';
-  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'отзыва';
-  return 'отзывов';
-}
-function pluralizeScans(n) {
-  if (n % 10 === 1 && n % 100 !== 11) return 'скан';
-  if ([2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100)) return 'скана';
-  return 'сканов';
-}
+/* ============================================================
+   FILTERS / STATS
+   ============================================================ */
 
-function daysBetween(dateA, dateB) {
-  const MS_PER_DAY = 24 * 60 * 60 * 1000;
-  const startOfA = new Date(dateA.getFullYear(), dateA.getMonth(), dateA.getDate());
-  const startOfB = new Date(dateB.getFullYear(), dateB.getMonth(), dateB.getDate());
-  return Math.round((startOfA - startOfB) / MS_PER_DAY);
-}
-
-/* ---------- Расчёт статистики ---------- */
-
-function computeStats(rows) {
-  const totalReviews = rows.length;
-  const totalScore = rows.reduce((sum, row) => sum + (Number(row.rating) || 0), 0);
-  const avgRating = totalReviews ? totalScore / totalReviews : 0;
-
-  const staffNames = new Set(rows.map((row) => row.barista));
-  const grouped = {};
-  staffNames.forEach((name) => { grouped[name] = { count: 0, total: 0 }; });
-
-  rows.forEach((row) => {
-    if (grouped[row.barista]) {
-      grouped[row.barista].count += 1;
-      grouped[row.barista].total += (Number(row.rating) || 0);
-    }
-  });
-
-  const team = Array.from(staffNames)
-  .map((name) => {
-    const scans = Array.isArray(allVisits)
-      ? allVisits.filter((v) => {
-          const sameBarista = v.barista === name.toLowerCase();
-
-          const sameMonth =
-            selectedMonthKey === "all" ||
-            !selectedMonthKey ||
-            v.monthKey === selectedMonthKey;
-
-          return sameBarista && sameMonth;
-        }).length
-      : 0;
-
-    return {
-      name,
-      count: grouped[name].count,
-      scans,
-      avg: grouped[name].count
-        ? grouped[name].total / grouped[name].count
-        : 0
-    };
-  })
-  .filter((member) => member.count > 0 || member.scans > 0)
-  .sort((a, b) => b.avg - a.avg || b.scans - a.scans);
-
-return {
-  totalReviews,
-  avgRating,
-  team,
-  best: team.length ? team[0] : null
-};
-}
-
-/* ---------- Фильтрация: месяц + бариста + негатив ---------- */
-
-// Строки только с учётом выбранного месяца — база для команды/лучшего сотрудника/недели
 function getMonthRows() {
-  if (selectedMonthKey === 'all') return allRows;
-  return allRows.filter((r) => r.monthKey === selectedMonthKey);
+  return selectedMonthKey === 'all'
+    ? allRows
+    : allRows.filter(row => row.monthKey === selectedMonthKey);
 }
 
-// Полная выборка: месяц + бариста + негатив — для шапки и ленты отзывов
 function getDisplayRows() {
-  return getMonthRows().filter((row) => {
-    if (selectedBarista && row.barista !== selectedBarista) return false;
-    if (onlyNegative && row.rating > 3) return false;
+  return getMonthRows().filter(row => {
+    if (selectedBarista && row.barista !== selectedBarista) {
+      return false;
+    }
+
+    if (onlyNegative && row.rating > 3) {
+      return false;
+    }
+
     return true;
   });
 }
+
+function computeStats(rows) {
+  const totalReviews = rows.length;
+
+  const avgRating = totalReviews
+    ? rows.reduce((sum, row) => sum + row.rating, 0) / totalReviews
+    : 0;
+
+  const grouped = {};
+
+  rows.forEach(row => {
+    if (!grouped[row.barista]) {
+      grouped[row.barista] = {
+        count: 0,
+        total: 0
+      };
+    }
+
+    grouped[row.barista].count++;
+    grouped[row.barista].total += row.rating;
+  });
+
+  const team = Object.entries(grouped)
+    .map(([name, data]) => {
+      const scans = allVisits.filter(scan => {
+        const sameBarista =
+          scan.barista === name.toLowerCase();
+
+        const sameMonth =
+          selectedMonthKey === 'all' ||
+          scan.monthKey === selectedMonthKey;
+
+        return sameBarista && sameMonth;
+      }).length;
+
+      return {
+        name,
+        count: data.count,
+        scans,
+        avg: data.count ? data.total / data.count : 0
+      };
+    })
+    .sort((a, b) =>
+      b.avg - a.avg || b.scans - a.scans
+    );
+
+  return {
+    totalReviews,
+    avgRating,
+    team,
+    best: team[0] || null
+  };
+}
+
 function selectBarista(name) {
-  if (selectedBarista === name) {
-    selectedBarista = null;
-  } else {
-    selectedBarista = name;
-  }
+  selectedBarista =
+    selectedBarista === name ? null : name;
 
   renderDashboard();
 }
 
-/* ---------- Executive Snapshot ---------- */
+/* ============================================================
+   EXECUTIVE SNAPSHOT
+   ============================================================ */
 
 function renderExecutiveSnapshot(monthRows) {
   const now = new Date();
 
-  // «Негатив за сегодня» — всегда про реальный текущий день, вне зависимости от фильтра месяца
-  const todayNegatives = allRows.filter((r) => {
-    const d = r.dateObj;
-    return d.getFullYear() === now.getFullYear() &&
-           d.getMonth() === now.getMonth() &&
-           d.getDate() === now.getDate() &&
-           r.rating <= 3;
+  const todayNegatives = allRows.filter(row => {
+    const d = row.dateObj;
+
+    return (
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate() &&
+      row.rating <= 3
+    );
   }).length;
 
-  const negCard = document.getElementById('snapshot-negative-today');
-  const negTitleEl = document.getElementById('snapshot-negative-title');
-  if (negCard && negTitleEl) {
-    negCard.classList.remove('is-clear', 'is-alert');
-    if (todayNegatives > 0) {
-      negCard.classList.add('is-alert');
-      negTitleEl.textContent = `${todayNegatives} ${pluralizeReviews(todayNegatives)}`;
-    } else {
-      negCard.classList.add('is-clear');
-      negTitleEl.textContent = 'Нет замечаний';
-    }
+  const negCard =
+    document.getElementById('snapshot-negative-today');
+
+  const negTitle =
+    document.getElementById('snapshot-negative-title');
+
+  if (negCard && negTitle) {
+    const alert = todayNegatives > 0;
+
+    negCard.classList.toggle('is-alert', alert);
+    negCard.classList.toggle('is-clear', !alert);
+
+    negTitle.textContent = alert
+      ? `${todayNegatives} ${pluralizeReviews(todayNegatives)}`
+      : 'Нет замечаний';
   }
 
-  // «Рейтинг за неделю» / «Лидер недели» — считаются внутри выбранного месяца,
-  // с точкой отсчёта на самой свежей дате в этом срезе
   const referenceDate = monthRows.length
-    ? monthRows.reduce((latest, r) => (r.dateObj > latest ? r.dateObj : latest), monthRows[0].dateObj)
+    ? monthRows.reduce(
+        (latest, row) =>
+          row.dateObj > latest ? row.dateObj : latest,
+        monthRows[0].dateObj
+      )
     : now;
 
-  const last7Rows = monthRows.filter((r) => daysBetween(referenceDate, r.dateObj) >= 0 && daysBetween(referenceDate, r.dateObj) <= 6);
-  const prev7Rows = monthRows.filter((r) => daysBetween(referenceDate, r.dateObj) >= 7 && daysBetween(referenceDate, r.dateObj) <= 13);
+  const last7Rows = monthRows.filter(row => {
+    const days = daysBetween(referenceDate, row.dateObj);
+    return days >= 0 && days <= 6;
+  });
+
+  const prev7Rows = monthRows.filter(row => {
+    const days = daysBetween(referenceDate, row.dateObj);
+    return days >= 7 && days <= 13;
+  });
 
   const weekStats = computeStats(last7Rows);
 
-  const weekRatingEl = document.getElementById('snapshot-week-rating');
-  if (weekRatingEl) {
-    weekRatingEl.textContent = weekStats.totalReviews > 0 ? `${weekStats.avgRating.toFixed(1)} ★` : '—';
+  const weekRating =
+    document.getElementById('snapshot-week-rating');
+
+  if (weekRating) {
+    weekRating.textContent =
+      weekStats.totalReviews
+        ? `${weekStats.avgRating.toFixed(1)} ★`
+        : '—';
   }
 
-  const weekLeaderEl = document.getElementById('snapshot-week-leader');
-  if (weekLeaderEl) {
-    weekLeaderEl.textContent = weekStats.best
-      ? `${weekStats.best.name} · ${weekStats.best.avg.toFixed(1)}`
+  const weekLeader =
+    document.getElementById('snapshot-week-leader');
+
+  if (weekLeader) {
+    weekLeader.textContent = weekStats.best
+      ? `${formatName(weekStats.best.name)} · ${weekStats.best.avg.toFixed(1)}`
       : 'Нет данных';
   }
 
-  // Тренд: у кого сильнее всего просел рейтинг по сравнению с предыдущей неделей
-  const last7Team = computeStats(last7Rows).team;
-  const prev7Team = computeStats(prev7Rows).team;
+  const currentTeam = computeStats(last7Rows).team;
+  const previousTeam = computeStats(prev7Rows).team;
 
   let worstDrop = null;
-  last7Team.forEach((member) => {
-    const previous = prev7Team.find((m) => m.name === member.name);
-    if (!previous || previous.count === 0 || member.count === 0) return;
+
+  currentTeam.forEach(member => {
+    const previous = previousTeam.find(
+      item => item.name === member.name
+    );
+
+    if (!previous || !member.count || !previous.count) return;
+
     const drop = previous.avg - member.avg;
-    if (drop > 0.01 && (!worstDrop || drop > worstDrop.drop)) {
-      worstDrop = { name: member.name, drop };
+
+    if (
+      drop > 0.01 &&
+      (!worstDrop || drop > worstDrop.drop)
+    ) {
+      worstDrop = {
+        name: member.name,
+        drop
+      };
     }
   });
 
-  const trendCard = document.getElementById('snapshot-trend');
-  const trendIcon = document.getElementById('snapshot-trend-icon');
-  const trendTitleEl = document.getElementById('snapshot-trend-title');
-  if (trendCard && trendTitleEl) {
-    trendCard.classList.remove('is-stable', 'is-alert');
-    if (worstDrop) {
-      trendCard.classList.add('is-alert');
-      if (trendIcon) trendIcon.textContent = '⚠️';
-      trendTitleEl.textContent = `Рейтинг ${worstDrop.name} падает`;
-    } else {
-      trendCard.classList.add('is-stable');
-      if (trendIcon) trendIcon.textContent = '✅';
-      trendTitleEl.textContent = 'Все стабильно';
+  const trendCard =
+    document.getElementById('snapshot-trend');
+
+  const trendIcon =
+    document.getElementById('snapshot-trend-icon');
+
+  const trendTitle =
+    document.getElementById('snapshot-trend-title');
+
+  if (trendCard && trendTitle) {
+    const alert = Boolean(worstDrop);
+
+    trendCard.classList.toggle('is-alert', alert);
+    trendCard.classList.toggle('is-stable', !alert);
+
+    if (trendIcon) {
+      trendIcon.textContent = alert ? '⚠️' : '✓';
     }
+
+    trendTitle.textContent = alert
+      ? `Рейтинг ${formatName(worstDrop.name)} падает`
+      : 'Все стабильно';
   }
 }
 
-/* ---------- Заполнение селекта месяцев ---------- */
+/* ============================================================
+   HEADER
+   ============================================================ */
 
 function populateMonthSelect() {
   const select = document.getElementById('month-select');
   if (!select) return;
 
-  const previousValue = selectedMonthKey;
-  const uniqueKeys = new Set(allRows.map((row) => row.monthKey).filter(Boolean));
-  const sortedKeys = Array.from(uniqueKeys).sort();
+  const keys = [
+    ...new Set(
+      allRows
+        .map(row => row.monthKey)
+        .filter(Boolean)
+    )
+  ].sort();
 
   select.innerHTML = '<option value="all">Все время</option>';
 
-  sortedKeys.forEach((key) => {
+  keys.forEach(key => {
     const [year, month] = key.split('-').map(Number);
+
     const option = document.createElement('option');
+
     option.value = key;
-    option.textContent = `${monthNames[month - 1]} ${year}`;
+    option.textContent =
+      `${monthNames[month - 1]} ${year}`;
+
     select.appendChild(option);
   });
 
-  select.value = sortedKeys.includes(previousValue) || previousValue === 'all' ? previousValue : 'all';
-  selectedMonthKey = select.value;
-}
+  if (!keys.includes(selectedMonthKey)) {
+    selectedMonthKey = 'all';
+  }
 
-/* ---------- Рендер: шапка + конверсия QR ---------- */
+  select.value = selectedMonthKey;
+}
 
 function renderHeaderStats(displayRows) {
   const stats = computeStats(displayRows);
-  const totalEl = document.getElementById('stat-total-reviews');
-  const avgEl = document.getElementById('stat-avg-rating');
-  const totalLabel = document.getElementById('stat-total-label');
-  const avgLabel = document.getElementById('stat-avg-label');
 
-  if (totalEl) totalEl.textContent = String(stats.totalReviews);
-  if (avgEl) avgEl.textContent = stats.avgRating > 0 ? stats.avgRating.toFixed(1) : '0.0';
+  const total = document.getElementById('stat-total-reviews');
+  const avg = document.getElementById('stat-avg-rating');
 
-  if (totalLabel && avgLabel) {
-    const scopeParts = [];
-    if (selectedMonthKey !== 'all') {
-      const [year, month] = selectedMonthKey.split('-').map(Number);
-      scopeParts.push(`${monthNames[month - 1]} ${year}`);
-    }
-    if (selectedBarista) scopeParts.push(selectedBarista);
-    if (onlyNegative) scopeParts.push('негативные');
+  const totalLabel =
+    document.getElementById('stat-total-label');
 
-    totalLabel.textContent = scopeParts.length ? `Отзывов · ${scopeParts.join(', ')}` : 'Всего отзывов';
-    avgLabel.textContent = scopeParts.length ? `Средний балл · ${scopeParts.join(', ')}` : 'Средний балл';
+  const avgLabel =
+    document.getElementById('stat-avg-label');
+
+  if (total) {
+    total.textContent = stats.totalReviews;
   }
 
-  // Конверсия QR = (Всего отзывов / Всего сканов) * 100 — глобальная метрика кофейни,
-  // не зависит от текущих фильтров, как и в бэкенде /doGet
-  const conversionEl = document.getElementById('snapshot-conversion');
-
-if (conversionEl) {
-
-  const filteredScans = Array.isArray(allVisits)
-    ? allVisits.filter((v) => {
-        return (
-          selectedMonthKey === "all" ||
-          !selectedMonthKey ||
-          v.monthKey === selectedMonthKey
-        );
-      }).length
-    : 0;
-
-  const filteredReviews = getMonthRows().length;
-
-  if (filteredScans > 0) {
-    const rate = ((filteredReviews / filteredScans) * 100).toFixed(1);
-    conversionEl.textContent = `${rate}%`;
-  } else {
-    conversionEl.textContent = "—";
+  if (avg) {
+    avg.textContent =
+      stats.avgRating
+        ? stats.avgRating.toFixed(1)
+        : '0.0';
   }
 
-  const conversionCard = conversionEl.closest(".snapshot-card");
+  const scope = [];
 
-  if (conversionCard) {
-    conversionCard.setAttribute(
-      "data-tooltip",
-      `Отзывов: ${filteredReviews} · Сканов: ${filteredScans} · Конверсия QR за выбранный период`
-    );
+  if (selectedMonthKey !== 'all') {
+    const [year, month] =
+      selectedMonthKey.split('-').map(Number);
+
+    scope.push(`${monthNames[month - 1]} ${year}`);
+  }
+
+  if (selectedBarista) {
+    scope.push(formatName(selectedBarista));
+  }
+
+  if (onlyNegative) {
+    scope.push('негативные');
+  }
+
+  if (totalLabel) {
+    totalLabel.textContent =
+      scope.length
+        ? `Отзывов · ${scope.join(', ')}`
+        : 'Всего отзывов';
+  }
+
+  if (avgLabel) {
+    avgLabel.textContent =
+      scope.length
+        ? `Средний балл · ${scope.join(', ')}`
+        : 'Средний балл';
+  }
+
+  const conversion =
+    document.getElementById('snapshot-conversion');
+
+  if (!conversion) return;
+
+  const scans = allVisits.filter(scan =>
+    selectedMonthKey === 'all' ||
+    scan.monthKey === selectedMonthKey
+  ).length;
+
+  const reviews = getMonthRows().length;
+
+  conversion.textContent =
+    scans
+      ? `${((reviews / scans) * 100).toFixed(1)}%`
+      : '—';
+
+  const card = conversion.closest('.snapshot-card');
+
+  if (card) {
+    card.dataset.tooltip =
+      `Отзывов: ${reviews} · Сканов: ${scans} · Конверсия QR за выбранный период`;
   }
 }
-}
 
-/* ---------- Рендер: лучший сотрудник (по выбранному месяцу) ---------- */
+/* ============================================================
+   BEST EMPLOYEE
+   ============================================================ */
 
 function renderBestEmployee(monthRows) {
   const stats = computeStats(monthRows);
 
-  const nameEl = document.getElementById('best-name');
-  const scoreEl = document.getElementById('best-score');
-  if (!nameEl) return;
+  const name = document.getElementById('best-name');
+  const score = document.getElementById('best-score');
+
+  if (!name) return;
 
   if (!stats.best) {
-    nameEl.textContent = 'Нет данных за этот период';
-    if (scoreEl) scoreEl.textContent = '';
+    name.textContent = 'Нет данных за этот период';
+
+    if (score) score.textContent = '';
+
     return;
   }
 
-  nameEl.textContent = stats.best.name;
-  if (scoreEl) {
-    scoreEl.textContent = `${stats.best.avg.toFixed(1)} из 5 · ${stats.best.count} ${pluralizeReviews(stats.best.count)}`;
+  name.textContent = formatName(stats.best.name);
+
+  if (score) {
+    score.textContent =
+      `${stats.best.avg.toFixed(1)} из 5 · ` +
+      `${stats.best.count} ${pluralizeReviews(stats.best.count)}`;
   }
 }
 
-/* ---------- Рендер: карточки команды (по выбранному месяцу) ---------- */
+/* ============================================================
+   TEAM
+   ============================================================ */
 
 function renderTeamGrid(monthRows) {
-  const stats = computeStats(monthRows);
   const grid = document.getElementById('team-grid');
   if (!grid) return;
 
+  const stats = computeStats(monthRows);
+
   grid.innerHTML = '';
 
-  stats.team.forEach((member) => {
-    const platformClicks = allPlatformClicks.filter((click) => {
-      const sameBarista = click.barista === member.name.toLowerCase();
+  stats.team.forEach(member => {
+    const clicks = allPlatformClicks.filter(click => {
+      const sameBarista =
+        click.barista === member.name.toLowerCase();
+
       const sameMonth =
         selectedMonthKey === 'all' ||
-        !selectedMonthKey ||
         click.monthKey === selectedMonthKey;
 
       return sameBarista && sameMonth;
     });
 
-    const clicks2gis = platformClicks.filter((c) => c.platform === '2gis').length;
-    const clicksYandex = platformClicks.filter((c) => c.platform === 'yandex').length;
-    const clicksInstagram = platformClicks.filter((c) => c.platform === 'instagram').length;
+    const clicks2gis =
+      clicks.filter(c => c.platform === '2gis').length;
+
+    const clicksYandex =
+      clicks.filter(c => c.platform === 'yandex').length;
+
+    const clicksInstagram =
+      clicks.filter(c => c.platform === 'instagram').length;
+
+    const hasNegative = monthRows.some(
+      row =>
+        row.barista === member.name &&
+        row.rating <= 3
+    );
 
     const card = document.createElement('button');
-    card.type = 'button';
-    card.className =
-      'team-card' + (selectedBarista === member.name ? ' active-card' : '');
 
-    card.onclick = () => selectBarista(member.name);
+    card.type = 'button';
+
+    card.className =
+      'team-card' +
+      (selectedBarista === member.name
+        ? ' active-card'
+        : '') +
+      (hasNegative
+        ? ' has-negative'
+        : '');
+
+    card.onclick = () =>
+      selectBarista(member.name);
 
     card.innerHTML = `
       <div class="team-platforms-row">
-        <span class="platform-chip chip-2gis">2ГИС <b>${clicks2gis}</b></span>
-        <span class="platform-chip chip-yandex">Яндекс <b>${clicksYandex}</b></span>
-        <span class="platform-chip chip-insta">Inst <b>${clicksInstagram}</b></span>
+        <span class="platform-chip chip-2gis">
+          2ГИС <b>${clicks2gis}</b>
+        </span>
+
+        <span class="platform-chip chip-yandex">
+          Яндекс <b>${clicksYandex}</b>
+        </span>
+
+        <span class="platform-chip chip-insta">
+          Inst <b>${clicksInstagram}</b>
+        </span>
       </div>
 
       <div class="team-card-header">
-        <div class="team-avatar">${member.name.charAt(0).toUpperCase()}</div>
+        <div class="team-avatar">
+          ${formatName(member.name).charAt(0)}
+        </div>
+
         <div class="team-user-info">
-          <div class="team-name">${member.name}</div>
+          <div class="team-name">
+            ${formatName(member.name)}
+          </div>
+
           <div class="team-count">
-            ${member.count} ${pluralizeReviews(member.count)} · ${member.scans} ${pluralizeScans(member.scans)}
+            ${member.count}
+            ${pluralizeReviews(member.count)}
+            ·
+            ${member.scans}
+            ${pluralizeScans(member.scans)}
           </div>
         </div>
       </div>
 
       <div class="team-score-row">
         <span class="team-score-value">
-          ${member.avg ? member.avg.toFixed(1) : '0.0'}
+          ${member.avg.toFixed(1)}
         </span>
-        <span class="team-score-max">из 5.0</span>
+
+        <span class="team-score-max">
+          из 5.0
+        </span>
       </div>
 
       <div class="progress-track">
-        <div class="progress-fill" style="width: ${Math.min((member.avg / 5) * 100, 100)}%"></div>
+        <div
+          class="progress-fill"
+          style="width:${Math.min(member.avg / 5 * 100, 100)}%"
+        ></div>
       </div>
     `;
 
-    const conversion =
-      member.scans > 0
-        ? ((member.count / member.scans) * 100).toFixed(1)
-        : '—';
+    const conversion = member.scans
+      ? ((member.count / member.scans) * 100).toFixed(1)
+      : '—';
 
-    card.setAttribute(
-      'data-tooltip',
-      `Отзывы: ${member.count}\nСканов: ${member.scans}\nКонверсия: ${conversion}%`
-    );
+    card.dataset.tooltip =
+      `Отзывы: ${member.count}\n` +
+      `Сканов: ${member.scans}\n` +
+      `Конверсия: ${conversion}%`;
 
     grid.appendChild(card);
   });
 }
 
-/* ---------- Рендер: статистика по платформам ---------- */
+/* ============================================================
+   PLATFORM STATS
+   ============================================================ */
 
 function renderPlatformStats() {
-  const grid = document.getElementById('platform-stats-grid');
-  if (!grid) return;
+  const grid =
+    document.getElementById('platform-stats-grid');
 
-  const filtered =
-    selectedPlatform === 'all'
-      ? allPlatformClicks
-      : allPlatformClicks.filter((row) => row.platform === selectedPlatform);
+  if (!grid) return;
 
   const platforms = [
-    { id: '2gis', name: '2ГИС', badgeClass: 'chip-2gis' },
-    { id: 'yandex', name: 'Яндекс', badgeClass: 'chip-yandex' },
-    { id: 'instagram', name: 'Instagram', badgeClass: 'chip-insta' }
+    { id: '2gis', name: '2ГИС', icon: '📍' },
+    { id: 'yandex', name: 'Яндекс', icon: '🔴' },
+    { id: 'instagram', name: 'Instagram', icon: '◎' }
   ];
-
-  grid.innerHTML = '';
-
-  platforms.forEach((platform) => {
-    const clicks = filtered.filter((row) => row.platform === platform.id);
-    const total = clicks.length;
-    const baristas = {};
-
-    clicks.forEach((row) => {
-      const name = String(row.barista || '').trim();
-      if (!name || name === 'unknown') return;
-      baristas[name] = (baristas[name] || 0) + 1;
-    });
-
-    const sortedBaristas = Object.entries(baristas).sort((a, b) => b[1] - a[1]);
-
-    const card = document.createElement('div');
-    card.className = 'platform-stat-card';
-
-    card.innerHTML = `
-      <div class="platform-stat-header">
-        <span class="platform-chip ${platform.badgeClass}">${platform.name}</span>
-        <div class="platform-stat-total">
-          ${total} ${total === 1 ? 'переход' : 'переходов'}
-        </div>
-      </div>
-
-      <div class="platform-stat-baristas">
-        ${
-          sortedBaristas.length
-            ? sortedBaristas
-                .map(
-                  ([name, count]) => `
-                <div class="platform-barista-row">
-                  <span class="platform-barista-name">${name}</span>
-                  <span class="platform-barista-count">${count}</span>
-                </div>
-              `
-                )
-                .join('')
-            : `<div class="platform-empty">Нет данных</div>`
-        }
-      </div>
-    `;
-
-    grid.appendChild(card);
-  });
-} 
-/* ---------- Рендер: лента отзывов ---------- */
-
-function renderReviewsFeed(displayRows) {
-  const feed = document.getElementById('reviews-feed');
-  const titleEl = document.getElementById('reviews-title');
-  if (!feed) return;
-  feed.innerHTML = '';
-
-  if (titleEl) {
-    const titleParts = [];
-    if (selectedMonthKey !== 'all') {
-      const [year, month] = selectedMonthKey.split('-').map(Number);
-      titleParts.push(`${monthNames[month - 1]} ${year}`);
-    }
-    if (selectedBarista) titleParts.push(selectedBarista);
-    if (onlyNegative) titleParts.push('только негативные');
-    titleEl.textContent = titleParts.length ? `Отзывы · ${titleParts.join(', ')}` : 'Последние отзывы';
-  }
-
-  if (!displayRows.length) {
-    feed.innerHTML = '<div class="state-placeholder">По этому фильтру отзывов нет</div>';
-    return;
-  }
-
-  // Сортируем от новых к старым перед выводом
-  displayRows.slice().sort((a, b) => b.dateObj - a.dateObj).forEach((row) => {
-    const isNegative = row.rating <= 3;
-    const item = document.createElement('div');
-    item.className = 'review-item' + (isNegative ? ' is-negative' : '');
-
-    item.innerHTML = `
-      <div class="review-meta">
-        <span class="review-barista">${row.barista}</span>
-        <span class="review-date">${row.dateLabel}</span>
-        <span class="review-rating ${isNegative ? 'is-negative' : ''}">${row.rating.toFixed(1)} ★</span>
-      </div>
-      ${row.comment ? `<p class="review-comment">${row.comment}</p>` : ''}
-    `;
-
-    feed.appendChild(item);
-  });
-}
-
-/* ---------- Рендер: состояние кнопок фильтров ---------- */
-
-function renderFilterButtons() {
-  const resetBtn = document.getElementById('reset-filter-btn');
-  if (resetBtn) resetBtn.classList.toggle('is-disabled', selectedBarista === null);
-
-  const negativeBtn = document.getElementById('negative-filter-btn');
-  if (negativeBtn) negativeBtn.classList.toggle('is-active', onlyNegative);
-}
-
-/* ---------- Главная функция рендера: единая точка входа ---------- */
-
-function renderDashboard() {
-  const monthRows = getMonthRows();
-  const displayRows = getDisplayRows();
-
-  renderExecutiveSnapshot(monthRows);
-  renderBestEmployee(monthRows);
-  renderTeamGrid(monthRows);
-  renderHeaderStats(displayRows);
-  renderReviewsFeed(displayRows);
-  renderFilterButtons();
-
-  renderPlatformStats();
-}
-/* ---------- Инициализация ---------- */
-
-document.addEventListener('DOMContentLoaded', () => {
-  const resetBtn = document.getElementById('reset-filter-btn');
-
-  if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-      selectedBarista = null;
-      renderDashboard();
-    });
-  }
-
-  const negativeBtn = document.getElementById('negative-filter-btn');
-
-  if (negativeBtn) {
-    negativeBtn.addEventListener('click', () => {
-      onlyNegative = !onlyNegative;
-      renderDashboard();
-    });
-  }
-
-  const monthSelect = document.getElementById('month-select');
-
-  if (monthSelect) {
-    monthSelect.addEventListener('change', (event) => {
-      selectedMonthKey = event.target.value;
-      renderDashboard();
-    });
-  }
-
-  // ---------- Фильтр платформ ----------
-
-  document
-    .querySelectorAll('.platform-filter-btn')
-    .forEach((button) => {
-
-      button.addEventListener('click', () => {
-        selectedPlatform =
-          button.dataset.platformFilter || 'all';
-
-        document
-          .querySelectorAll('.platform-filter-btn')
-          .forEach((btn) => {
-            btn.classList.toggle(
-              'is-active',
-              btn === button
-            );
-          });
-
-        renderPlatformStats();
-      });
-
-    });
-
-  fetchData();
-});
-function renderPlatformStats() {
-  const grid = document.getElementById('platform-stats-grid');
-  if (!grid) return;
 
   const filtered =
     selectedPlatform === 'all'
@@ -878,47 +842,29 @@ function renderPlatformStats() {
           row => row.platform === selectedPlatform
         );
 
-  const platforms = [
-    {
-      id: '2gis',
-      name: '2ГИС',
-      icon: '📍'
-    },
-    {
-      id: 'yandex',
-      name: 'Яндекс',
-      icon: '🔴'
-    },
-    {
-      id: 'instagram',
-      name: 'Instagram',
-      icon: '◎'
-    }
-  ];
-
   grid.innerHTML = '';
 
-  platforms.forEach((platform) => {
+  platforms.forEach(platform => {
     const clicks = filtered.filter(
       row => row.platform === platform.id
     );
 
-    const total = clicks.length;
+    const counts = {};
 
-    const baristas = {};
-
-    clicks.forEach((row) => {
+    clicks.forEach(row => {
       const name = String(row.barista || '').trim();
 
-      if (!name || name === 'unknown') return;
-
-      baristas[name] = (baristas[name] || 0) + 1;
+      if (name && name !== 'unknown') {
+        counts[name] = (counts[name] || 0) + 1;
+      }
     });
 
-    const sortedBaristas = Object.entries(baristas)
-      .sort((a, b) => b[1] - a[1]);
+    const baristas =
+      Object.entries(counts)
+        .sort((a, b) => b[1] - a[1]);
 
     const card = document.createElement('div');
+
     card.className = 'platform-stat-card';
 
     card.innerHTML = `
@@ -933,18 +879,19 @@ function renderPlatformStats() {
           </div>
 
           <div class="platform-stat-total">
-            ${total} ${total === 1 ? 'переход' : 'переходов'}
+            ${clicks.length}
+            ${clicks.length === 1 ? 'переход' : 'переходов'}
           </div>
         </div>
       </div>
 
       <div class="platform-stat-baristas">
         ${
-          sortedBaristas.length
-            ? sortedBaristas.map(([name, count]) => `
+          baristas.length
+            ? baristas.map(([name, count]) => `
                 <div class="platform-barista-row">
                   <span class="platform-barista-name">
-                    ${name}
+                    ${formatName(name)}
                   </span>
 
                   <span class="platform-barista-count">
@@ -964,3 +911,180 @@ function renderPlatformStats() {
     grid.appendChild(card);
   });
 }
+
+/* ============================================================
+   REVIEWS FEED
+   ============================================================ */
+
+function renderReviewsFeed(displayRows) {
+  const feed =
+    document.getElementById('reviews-feed');
+
+  const title =
+    document.getElementById('reviews-title');
+
+  if (!feed) return;
+
+  feed.innerHTML = '';
+
+  const scope = [];
+
+  if (selectedMonthKey !== 'all') {
+    const [year, month] =
+      selectedMonthKey.split('-').map(Number);
+
+    scope.push(`${monthNames[month - 1]} ${year}`);
+  }
+
+  if (selectedBarista) {
+    scope.push(formatName(selectedBarista));
+  }
+
+  if (onlyNegative) {
+    scope.push('только негативные');
+  }
+
+  if (title) {
+    title.textContent =
+      scope.length
+        ? `Отзывы · ${scope.join(', ')}`
+        : 'Последние отзывы';
+  }
+
+  if (!displayRows.length) {
+    feed.innerHTML =
+      '<div class="state-placeholder">' +
+      'По этому фильтру отзывов нет' +
+      '</div>';
+
+    return;
+  }
+
+  displayRows
+    .slice()
+    .sort((a, b) => b.dateObj - a.dateObj)
+    .forEach(row => {
+      const negative = row.rating <= 3;
+
+      const item =
+        document.createElement('div');
+
+      item.className =
+        'review-item' +
+        (negative ? ' is-negative' : '');
+
+      item.innerHTML = `
+        <div class="review-meta">
+          <span class="review-barista">
+            ${formatName(row.barista)}
+          </span>
+
+          <span class="review-date">
+            ${row.dateLabel}
+          </span>
+
+          <span class="review-rating ${
+            negative ? 'is-negative' : ''
+          }">
+            ${row.rating.toFixed(1)} ★
+          </span>
+        </div>
+
+        ${
+          row.comment
+            ? `<p class="review-comment">${row.comment}</p>`
+            : ''
+        }
+      `;
+
+      feed.appendChild(item);
+    });
+}
+
+/* ============================================================
+   FILTER BUTTONS
+   ============================================================ */
+
+function renderFilterButtons() {
+  const reset =
+    document.getElementById('reset-filter-btn');
+
+  const negative =
+    document.getElementById('negative-filter-btn');
+
+  reset?.classList.toggle(
+    'is-disabled',
+    selectedBarista === null
+  );
+
+  negative?.classList.toggle(
+    'is-active',
+    onlyNegative
+  );
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+
+function renderDashboard() {
+  const monthRows = getMonthRows();
+  const displayRows = getDisplayRows();
+
+  renderExecutiveSnapshot(monthRows);
+  renderBestEmployee(monthRows);
+  renderTeamGrid(monthRows);
+  renderHeaderStats(displayRows);
+  renderReviewsFeed(displayRows);
+  renderFilterButtons();
+  renderPlatformStats();
+}
+
+/* ============================================================
+   EVENTS
+   ============================================================ */
+
+document.addEventListener('DOMContentLoaded', () => {
+  document
+    .getElementById('reset-filter-btn')
+    ?.addEventListener('click', () => {
+      selectedBarista = null;
+      renderDashboard();
+    });
+
+  document
+    .getElementById('negative-filter-btn')
+    ?.addEventListener('click', () => {
+      onlyNegative = !onlyNegative;
+      renderDashboard();
+    });
+
+  document
+    .getElementById('month-select')
+    ?.addEventListener('change', event => {
+      selectedMonthKey = event.target.value;
+      renderDashboard();
+    });
+
+  document
+    .querySelectorAll('.platform-filter-btn')
+    .forEach(button => {
+      button.addEventListener('click', () => {
+        selectedPlatform =
+          button.dataset.platformFilter || 'all';
+
+        document
+          .querySelectorAll('.platform-filter-btn')
+          .forEach(btn =>
+            btn.classList.toggle(
+              'is-active',
+              btn === button
+            )
+          );
+
+        renderPlatformStats();
+      });
+    });
+
+  fetchData();
+});
