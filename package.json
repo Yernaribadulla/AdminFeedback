@@ -1,0 +1,20 @@
+{
+  "name": "shtil-admin-feedback",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "playwright test",
+    "format:check": "prettier --check index.html style.css app.js src scripts tests playwright.config.js package.json .github/workflows/checks.yml"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1",
+    "prettier": "3.9.10"
+  }
+}

@@ -1,596 +1,353 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Штиль · Команда</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-
-  <link
-    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
-    rel="stylesheet"
-  >
-
-  <link rel="stylesheet" href="style.css">
-</head>
-
-<body>
-
-<div class="app-shell">
-
-  <!-- =========================
-       SIDEBAR
-  ========================== -->
-
-  <aside class="sidebar">
-
-    <div class="sidebar-brand">
-      <div class="brand-mark">Ш</div>
-
-      <div class="brand-copy">
-        <strong>Штиль</strong>
-        <span>Кофейня · Актау</span>
-      </div>
-    </div>
-
-    <nav class="main-nav">
-
-      <div class="nav-caption">
-        Рабочее пространство
-      </div>
-
-      <a href="#overview" class="nav-item is-active">
-        <span class="nav-icon">
-          <svg viewBox="0 0 24 24">
-            <rect x="4" y="4" width="6" height="6" rx="1"/>
-            <rect x="14" y="4" width="6" height="6" rx="1"/>
-            <rect x="4" y="14" width="6" height="6" rx="1"/>
-            <rect x="14" y="14" width="6" height="6" rx="1"/>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0d2e3e" />
+    <meta
+      name="description"
+      content="Штиль — отзывы гостей, результаты команды и аналитика сервиса кофейни в Актау."
+    />
+    <title>Штиль — на одной волне</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Перейти к аналитике</a>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a href="#overview" class="brand" aria-label="Штиль — к обзору">
+          <svg class="brand-symbol" viewBox="0 0 44 44" aria-hidden="true">
+            <path
+              d="M4 16c6-8 12 8 18 0s12 8 18 0M4 24c6-8 12 8 18 0s12 8 18 0M4 32c6-8 12 8 18 0s12 8 18 0"
+            />
           </svg>
-        </span>
-
-        Обзор
-      </a>
-
-      <a href="#team" class="nav-item">
-        <span class="nav-icon">
-          <svg viewBox="0 0 24 24">
-            <circle cx="9" cy="8" r="3"/>
-            <circle cx="17" cy="9" r="2.5"/>
-            <path d="M3.5 19c.6-3.1 2.4-5 5.5-5s4.9 1.9 5.5 5"/>
-            <path d="M14 15c2.6-.5 5.2.9 6 4"/>
-          </svg>
-        </span>
-
-        Команда
-      </a>
-
-      <a href="#reviews" class="nav-item">
-        <span class="nav-icon">
-          <svg viewBox="0 0 24 24">
-            <path d="M5 5.5h14v10H9l-4 3v-13z"/>
-            <path d="M8 9h8"/>
-            <path d="M8 12h5"/>
-          </svg>
-        </span>
-
-        Отзывы
-      </a>
-
-    </nav>
-
-    <div class="sidebar-bottom">
-
-      <div class="sidebar-status">
-        <span class="status-dot"></span>
-
-        <div>
-          <strong>Данные обновлены</strong>
-          <span>Система работает</span>
+          <span
+            ><strong>штиль<span class="brand-period">.</span></strong
+            ><small>КОФЕЙНЯ · АКТАУ</small></span
+          >
+        </a>
+        <div class="nav-caption">Рабочее пространство</div>
+        <nav class="main-nav" aria-label="Разделы аналитики">
+          <a class="nav-item is-active" href="#overview" aria-current="location"
+            ><span aria-hidden="true">◫</span> Обзор <small>01</small></a
+          >
+          <a class="nav-item" href="#team"
+            ><span aria-hidden="true">♧</span> Команда <small>02</small></a
+          >
+          <a class="nav-item" href="#reviews"
+            ><span aria-hidden="true">☷</span> Отзывы <small>03</small></a
+          >
+          <a class="nav-item" href="#channels"
+            ><span aria-hidden="true">↗</span> Каналы <small>04</small></a
+          >
+        </nav>
+        <div class="sidebar-sea" aria-hidden="true">
+          <span>43°39′ N<br />51°10′ E</span
+          ><svg viewBox="0 0 240 120">
+            <path
+              d="M-80 55Q-20 5 40 55T160 55T280 55T400 55M-80 70Q-20 20 40 70T160 70T280 70T400 70M-80 85Q-20 35 40 85T160 85T280 85T400 85M-80 100Q-20 50 40 100T160 100T280 100T400 100"
+            /></svg
+          ><small>Вдохновлено Каспием</small>
         </div>
-      </div>
-
-      <div class="sidebar-footer">
-        <span>Штиль</span>
-        <span>2026</span>
-      </div>
-
-    </div>
-
-  </aside>
-
-
-  <!-- =========================
-       MAIN
-  ========================== -->
-
-  <main class="main-content">
-
-    <!-- TOP BAR -->
-
-    <header class="topbar">
-
-      <div class="mobile-brand">
-        <div class="brand-mark">Ш</div>
-
-        <div>
-          <strong>Штиль</strong>
-          <span>Команда</span>
+        <div class="sidebar-bottom">
+          <div class="connection">
+            <i id="connection-dot"></i
+            ><span id="connection-label">Подключаем источники</span>
+          </div>
+          <button
+            id="motion-toggle"
+            class="motion-toggle"
+            type="button"
+            aria-pressed="true"
+          >
+            Анимация включена <span aria-hidden="true">≈</span></button
+          ><span class="sidebar-note">С заботой о каждом госте</span>
         </div>
-      </div>
-
-      <div class="topbar-context">
-
-        <span class="topbar-kicker">
-          Управление сервисом
-        </span>
-
-        <h1>
-          Команда
-        </h1>
-
-      </div>
-
-      <div class="topbar-actions">
-
-        <div class="period-control">
-
-          <label for="month-select">
-            Период
-          </label>
-
-          <select id="month-select" class="month-select">
-            <option value="all">Все время</option>
-          </select>
-
-        </div>
-
-        <button class="profile-button" type="button">
-  <img src="./sparxie.jpg" alt="Профиль" style="width: 32px; height: 32px; object-fit: cover; border-radius: 50%;">
-</button>
-
-      </div>
-
-    </header>
-
-
-    <!-- =========================
-         OVERVIEW
-    ========================== -->
-
-    <section class="overview-section" id="overview">
-
-      <div class="overview-heading">
-
-        <div>
-          <span class="section-kicker">
-            Обзор
-          </span>
-
-          <h2>
-            Как чувствует себя команда
-          </h2>
-
-          <p>
-            Ключевые показатели сервиса и обратной связи гостей.
-          </p>
-        </div>
-
-      </div>
-
-
-      <!-- MAIN PERFORMANCE -->
-
-      <div class="performance-layout">
-
-        <article class="rating-panel">
-
-          <div class="rating-panel-top">
-
-            <div>
-              <span class="metric-label">
-                Средний рейтинг
-              </span>
-
-              <div class="rating-value-row">
-
-                <strong
-                  class="rating-value"
-                  id="stat-avg-rating"
+      </aside>
+      <main id="main" class="main-content">
+        <header class="topbar">
+          <a class="mobile-brand" href="#overview">штиль.</a>
+          <div class="breadcrumb">Штиль <span>/</span> Аналитика команды</div>
+          <div class="topbar-actions">
+            <span class="live-label"><i></i> Обратная связь</span
+            ><button
+              id="refresh-btn"
+              class="icon-button"
+              type="button"
+              aria-label="Обновить данные"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M20 7v5h-5M4 17v-5h5M5.7 7a7 7 0 0 1 11.5-1L20 9M4 15l2.8 3A7 7 0 0 0 18.3 17"
+                />
+              </svg></button
+            ><span
+              class="workspace-avatar"
+              aria-label="Рабочее пространство Штиль"
+              >Ш</span
+            >
+          </div>
+        </header>
+        <div class="page-content">
+          <section id="overview" class="overview-section">
+            <div class="page-heading reveal">
+              <div>
+                <p class="eyebrow">КАЧЕСТВО СЕРВИСА · АКТАУ</p>
+                <h1>На одной волне.</h1>
+                <p class="page-intro">
+                  Слышать гостей. Поддерживать команду. Становиться лучше.
+                </p>
+              </div>
+              <div class="period-control">
+                <label for="month-select">Период аналитики</label
+                ><select id="month-select">
+                  <option value="all">Всё время</option>
+                </select>
+              </div>
+            </div>
+            <div
+              id="source-status"
+              class="source-status"
+              role="status"
+              aria-live="polite"
+            >
+              Загружаем отзывы, QR-сканы и переходы…
+            </div>
+            <div class="hero-grid">
+              <article
+                class="ocean-card reveal"
+                aria-labelledby="rating-heading"
+              >
+                <div class="ocean-glow"></div>
+                <svg
+                  class="ocean-waves"
+                  viewBox="0 0 1000 440"
+                  preserveAspectRatio="xMidYMid slice"
+                  aria-hidden="true"
                 >
-                  —
-                </strong>
-
-                <span class="rating-star">
-                  ★
-                </span>
-
+                  <defs>
+                    <linearGradient
+                      id="wave-gradient"
+                      x1="0"
+                      y1="0"
+                      x2="1"
+                      y2="1"
+                    >
+                      <stop stop-color="#79ded5" stop-opacity=".65" />
+                      <stop
+                        offset="1"
+                        stop-color="#8baec7"
+                        stop-opacity=".08"
+                      />
+                    </linearGradient>
+                  </defs>
+                  <g class="wave-layer wave-back">
+                    <path
+                      d="M-500 240Q-250 40 0 240T500 240T1000 240T1500 240V600H-500Z"
+                    />
+                  </g>
+                  <g class="wave-layer wave-middle">
+                    <path
+                      d="M-500 290Q-250 90 0 290T500 290T1000 290T1500 290V600H-500Z"
+                    />
+                  </g>
+                  <g class="wave-layer wave-front">
+                    <path
+                      d="M-500 340Q-250 140 0 340T500 340T1000 340T1500 340V600H-500Z"
+                    />
+                  </g>
+                  <g class="wave-contours">
+                    <path
+                      d="M-500 215Q-250 15 0 215T500 215T1000 215T1500 215M-500 230Q-250 30 0 230T500 230T1000 230T1500 230M-500 245Q-250 45 0 245T500 245T1000 245T1500 245M-500 260Q-250 60 0 260T500 260T1000 260T1500 260"
+                    />
+                  </g>
+                </svg>
+                <div class="ocean-top">
+                  <p id="rating-heading" class="card-kicker">Рейтинг команды</p>
+                  <span class="sea-pill"><i></i> CASPIAN SPIRIT</span>
+                </div>
+                <div class="rating-value">
+                  <strong id="stat-avg-rating">—</strong
+                  ><span aria-hidden="true">✦</span><small>из 5</small>
+                </div>
+                <p id="rating-caption" class="ocean-caption">
+                  Впечатления гостей в цифрах
+                </p>
+                <div class="ocean-footer">
+                  <div>
+                    <span>Отзывы гостей</span
+                    ><strong id="stat-total-reviews">—</strong>
+                  </div>
+                  <div>
+                    <span>Последние 7 дней</span
+                    ><strong id="week-rating">—</strong>
+                  </div>
+                  <div>
+                    <span>Динамика рейтинга</span
+                    ><strong id="week-delta">—</strong>
+                  </div>
+                </div>
+              </article>
+              <article class="insight-card reveal">
+                <div class="card-title-row">
+                  <h2>Пульс сервиса</h2>
+                  <span class="tiny-waves" aria-hidden="true">≈</span>
+                </div>
+                <p class="card-description">
+                  Внимание к деталям — в каждом показателе.
+                </p>
+                <div class="pulse-list">
+                  <div>
+                    <span class="metric-icon coral" aria-hidden="true">!</span
+                    ><span
+                      >Негативные отзывы<small>Оценки от 1 до 3</small></span
+                    ><strong id="negative-count">—</strong>
+                  </div>
+                  <div>
+                    <span class="metric-icon teal" aria-hidden="true">↗</span
+                    ><span
+                      >Отзывы / QR-сканы<small
+                        >Соотношение за период</small
+                      ></span
+                    ><strong id="conversion">—</strong>
+                  </div>
+                  <div>
+                    <span class="metric-icon sand" aria-hidden="true">⌁</span
+                    ><span>QR-сканы<small>Интерес к обратной связи</small></span
+                    ><strong id="scan-count">—</strong>
+                  </div>
+                </div>
+                <p id="scope-note" class="scope-note">
+                  Все сотрудники · весь период
+                </p>
+              </article>
+            </div>
+            <div class="analysis-grid">
+              <article class="chart-card reveal">
+                <div class="card-title-row">
+                  <div>
+                    <p class="eyebrow">КАЧЕСТВО В ДВИЖЕНИИ</p>
+                    <h2>Ритм обратной связи</h2>
+                  </div>
+                  <span class="chart-legend"><i></i> Средняя оценка</span>
+                </div>
+                <div id="rating-chart" class="rating-chart"></div>
+                <p id="chart-caption" class="chart-caption">
+                  14 дней · пропуски означают отсутствие отзывов
+                </p>
+              </article>
+              <article class="distribution-card reveal">
+                <p class="eyebrow">ГОЛОС ГОСТЕЙ</p>
+                <h2>Спектр впечатлений</h2>
+                <div id="distribution" class="distribution"></div>
+                <div class="positive-note">
+                  <span aria-hidden="true">✦</span>
+                  <p id="positive-note">Пока недостаточно данных</p>
+                </div>
+              </article>
+            </div>
+          </section>
+          <section id="team" class="team-section">
+            <div class="section-heading reveal">
+              <div>
+                <p class="eyebrow">ЛЮДИ ЗА ХОРОШИМ СЕРВИСОМ</p>
+                <h2>Команда Штиля</h2>
               </div>
-
-              <span class="rating-description">
-                По всем полученным отзывам
-              </span>
+              <button id="reset-filter-btn" class="text-button" type="button">
+                Все сотрудники <span aria-hidden="true">↗</span>
+              </button>
             </div>
-
-            <div class="rating-badge">
-              <span>Сервис</span>
-              <strong>★★★★★</strong>
-            </div>
-
-          </div>
-
-
-          <div class="rating-divider"></div>
-
-
-          <div class="rating-footer">
-
-            <div class="rating-stat">
-              <span>Всего отзывов</span>
-
-              <strong id="stat-total-reviews">
-                —
-              </strong>
-            </div>
-
-            <div class="rating-stat">
-              <span>За неделю</span>
-
-              <strong id="snapshot-week-rating">
-                —
-              </strong>
-            </div>
-
-            <div class="rating-stat">
-              <span>Сегодня</span>
-
-              <strong id="snapshot-negative-title">
-                —
-              </strong>
-            </div>
-
-          </div>
-
-        </article>
-
-
-        <!-- QUICK HEALTH -->
-
-        <div class="health-panel">
-
-          <div class="health-header">
-
-            <div>
-              <span class="metric-label">
-                Состояние
-              </span>
-
-              <h3>
-                Сервис сегодня
-              </h3>
-            </div>
-
-            <span class="health-indicator">
-              <span></span>
-              стабильно
-            </span>
-
-          </div>
-
-
-          <div class="health-list">
-
-            <div class="health-row">
-
-              <div class="health-icon negative">
-                !
+            <div id="leader-card" class="leader-card reveal"></div>
+            <p id="team-hint" class="section-hint">
+              Выберите сотрудника, чтобы увидеть его показатели во всех
+              разделах.
+            </p>
+            <div id="team-grid" class="team-grid"></div>
+          </section>
+          <section id="reviews" class="reviews-section">
+            <div class="section-heading reveal">
+              <div>
+                <p class="eyebrow">ОБРАТНАЯ СВЯЗЬ</p>
+                <h2>Что говорят гости</h2>
               </div>
-
-              <div class="health-copy">
-                <strong>Негативные отзывы</strong>
-                <span>3 звезды и ниже</span>
-              </div>
-
-              <strong
-                class="health-value"
-                id="snapshot-negative-title"
-              >
-                —
-              </strong>
-
+              <span id="reviews-count" class="count-label">—</span>
             </div>
-
-
-            <div class="health-row">
-
-              <div class="health-icon positive">
-                ↗
+            <div class="review-toolbar">
+              <div class="segmented" role="group" aria-label="Показать отзывы">
+                <button
+                  id="all-reviews-btn"
+                  class="is-active"
+                  type="button"
+                  aria-pressed="true"
+                >
+                  Все отзывы</button
+                ><button
+                  id="negative-filter-btn"
+                  type="button"
+                  aria-pressed="false"
+                >
+                  Требуют внимания <span id="negative-badge">0</span>
+                </button>
               </div>
-
-              <div class="health-copy">
-                <strong>Конверсия QR</strong>
-                <span>Отзывы от сканов</span>
+              <div class="search-field">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="10.5" cy="10.5" r="6.5" />
+                  <path d="m16 16 5 5" /></svg
+                ><input
+                  id="review-search"
+                  type="search"
+                  placeholder="Найти в отзывах…"
+                  aria-label="Поиск по тексту отзыва и сотруднику"
+                  maxlength="200"
+                />
               </div>
-
-              <strong
-                class="health-value"
-                id="snapshot-conversion"
-              >
-                —
-              </strong>
-
             </div>
-
-
-            <div class="health-row">
-
-              <div class="health-icon leader">
-                ★
+            <div id="reviews-feed" class="reviews-feed"></div>
+            <button id="load-more-btn" class="load-more" type="button" hidden>
+              Показать ещё
+            </button>
+          </section>
+          <section id="channels" class="channels-section">
+            <div class="section-heading reveal">
+              <div>
+                <p class="eyebrow">ТОЧКИ СОПРИКОСНОВЕНИЯ</p>
+                <h2>За пределами кофейни</h2>
               </div>
-
-              <div class="health-copy">
-                <strong>Лидер недели</strong>
-                <span>Лучший результат</span>
-              </div>
-
-              <strong
-                class="health-value health-name"
-                id="snapshot-week-leader"
-              >
-                —
-              </strong>
-
+              <span class="count-label">Переходы на платформы</span>
             </div>
-
-
-            <div class="health-row">
-
-              <div
-                class="health-icon trend"
-                id="snapshot-trend-icon"
-              >
-                ↑
-              </div>
-
-              <div class="health-copy">
-                <strong>Тренд команды</strong>
-                <span>Изменение рейтинга</span>
-              </div>
-
-              <strong
-                class="health-value health-name"
-                id="snapshot-trend-title"
-              >
-                —
-              </strong>
-
-            </div>
-
-          </div>
-
+            <div id="platform-stats-grid" class="platform-stats-grid"></div>
+            <p class="section-hint">
+              Переходы отражают интерес к платформам, а не количество
+              опубликованных там отзывов.
+            </p>
+          </section>
+          <footer class="main-footer">
+            <a href="#overview">штиль.</a
+            ><span>Хороший сервис начинается с умения слышать.</span
+            ><span id="updated-at">Источники подключаются</span>
+          </footer>
         </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- =========================
-         BEST EMPLOYEE
-    ========================== -->
-
-    <section class="leader-section">
-
-      <div class="leader-copy">
-
-        <span class="section-kicker">
-          Лучший результат
-        </span>
-
-        <h2>
-          Сотрудник месяца
-        </h2>
-
-        <p>
-          Лидер определяется по качеству отзывов и стабильности результата.
-        </p>
-
-      </div>
-
-
-      <article
-        class="leader-card"
-        id="best-employee"
+      </main>
+    </div>
+    <nav class="mobile-nav" aria-label="Мобильная навигация">
+      <a href="#overview">Обзор</a><a href="#team">Команда</a
+      ><a href="#reviews">Отзывы</a><a href="#channels">Каналы</a
+      ><button
+        id="mobile-motion-toggle"
+        type="button"
+        aria-label="Переключить анимацию"
+        aria-pressed="true"
       >
-
-        <div class="leader-avatar">
-          <span id="best-name-avatar">
-            ★
-          </span>
-        </div>
-
-        <div class="leader-main">
-
-          <span class="leader-label">
-            Лучший сотрудник
-          </span>
-
-          <h3 id="best-name">
-            —
-          </h3>
-
-          <div class="leader-score">
-
-            <strong id="best-score">
-              —
-            </strong>
-
-            <span>
-              средний рейтинг
-            </span>
-
-          </div>
-
-        </div>
-
-        <div class="leader-trophy">
-
-          <svg viewBox="0 0 24 24">
-            <path d="M8 4h8v3a4 4 0 0 1-4 4 4 4 0 0 1-4-4V4z"/>
-            <path d="M8 5H5a3 3 0 0 0 3 5"/>
-            <path d="M16 5h3a3 3 0 0 1-3 5"/>
-            <path d="M12 11v3"/>
-            <path d="M9 20h6"/>
-            <path d="M10 17h4v3h-4z"/>
-          </svg>
-
-        </div>
-
-      </article>
-
-    </section>
-
-
-    <!-- =========================
-         TEAM
-    ========================== -->
-
-    <section
-      class="team-section"
-      id="team"
+        ≈
+      </button>
+    </nav>
+    <noscript
+      ><p class="noscript">
+        Для загрузки аналитики включите JavaScript. Источник данных — Google
+        Sheets.
+      </p></noscript
     >
-
-      <div class="section-toolbar">
-
-        <div class="section-toolbar-copy">
-
-          <span class="section-kicker">
-            Команда
-          </span>
-
-          <h2>
-            Люди и результаты
-          </h2>
-
-        </div>
-
-
-        <div class="team-filters">
-
-          <button
-            type="button"
-            class="filter-btn is-active"
-            id="reset-filter-btn"
-          >
-            Все сотрудники
-          </button>
-
-          <button
-            type="button"
-            class="filter-btn warning-btn"
-            id="negative-filter-btn"
-          >
-            <svg viewBox="0 0 24 24">
-              <path d="M12 3.5L21 19H3z"/>
-              <path d="M12 9.5v4.2"/>
-              <circle
-                cx="12"
-                cy="16.6"
-                r="0.6"
-                fill="currentColor"
-                stroke="none"
-              />
-            </svg>
-
-            Есть негатив
-          </button>
-
-        </div>
-
-      </div>
-
-
-      <div
-        class="team-grid"
-        id="team-grid"
-      >
-
-        <div class="state-placeholder">
-          Загрузка данных команды…
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- =========================
-         REVIEWS
-    ========================== -->
-
-    <section
-      class="reviews-section"
-      id="reviews"
-    >
-
-      <div class="reviews-header">
-
-        <div>
-
-          <span class="section-kicker">
-            Обратная связь
-          </span>
-
-          <h2 id="reviews-title">
-            Что говорят гости
-          </h2>
-
-        </div>
-
-        <span class="reviews-count">
-          Последние отзывы
-        </span>
-
-      </div>
-
-
-      <div
-        class="reviews-feed"
-        id="reviews-feed"
-      >
-
-        <div class="state-placeholder">
-          Загрузка отзывов…
-        </div>
-
-      </div>
-
-    </section>
-
-
-    <!-- FOOTER -->
-
-    <footer class="main-footer">
-
-      <span>
-        Штиль · Аналитика команды
-      </span>
-
-      <span>
-        Данные используются для внутреннего анализа сервиса
-      </span>
-
-    </footer>
-
-  </main>
-
-</div>
-
-
-<script src="app.js"></script>
-
-</body>
+  </body>
 </html>
