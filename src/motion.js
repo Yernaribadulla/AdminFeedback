@@ -7,24 +7,46 @@ try {
 }
 let enabled = !preference.matches && chosen !== "off";
 let observer;
-const counters = new WeakMap();
+const pendingMetrics = new WeakMap();
 
 function apply() {
   document.documentElement.classList.toggle("motion-paused", !enabled);
   document.documentElement.classList.toggle("js-motion", enabled);
   document
     .querySelectorAll("#motion-toggle, #mobile-motion-toggle")
-    .forEach((button) => button.setAttribute("aria-pressed", String(enabled)));
+    .forEach((button) => {
+      button.setAttribute("aria-pressed", String(enabled));
+      button.disabled = preference.matches;
+      button.title = preference.matches
+        ? "Движение отключено в настройках системы"
+        : enabled
+          ? "Приостановить анимацию"
+          : "Включить анимацию";
+    });
   const button = document.getElementById("motion-toggle");
   button.replaceChildren(
     document.createTextNode(
-      enabled ? "Анимация включена " : "Анимация на паузе ",
+      preference.matches
+        ? "Без движения "
+        : enabled
+          ? "Анимация включена "
+          : "Анимация на паузе ",
     ),
   );
   const symbol = document.createElement("span");
   symbol.textContent = "≈";
   symbol.setAttribute("aria-hidden", "true");
   button.append(symbol);
+  document
+    .getElementById("mobile-motion-toggle")
+    .setAttribute(
+      "aria-label",
+      preference.matches
+        ? "Движение отключено системой"
+        : enabled
+          ? "Приостановить анимацию"
+          : "Включить анимацию",
+    );
 }
 
 export function initMotion() {
@@ -72,32 +94,20 @@ export function reveal() {
   });
 }
 
-export function countTo(
+export function setMetric(
   node,
   value,
   format = (number) => String(Math.round(number)),
 ) {
-  const previous = counters.get(node);
-  if (previous?.frame) cancelAnimationFrame(previous.frame);
-  if (value === null || !Number.isFinite(value)) {
-    counters.delete(node);
-    node.textContent = "—";
-    return;
-  }
-  if (!enabled || previous?.target === value) {
-    counters.set(node, { target: value, current: value });
-    node.textContent = format(value);
-    return;
-  }
-  const from = previous?.current ?? 0;
-  const start = performance.now();
-  const state = { target: value, current: from, frame: 0 };
-  counters.set(node, state);
-  const tick = (now) => {
-    const progress = enabled ? Math.min((now - start) / 750, 1) : 1;
-    state.current = from + (value - from) * (1 - (1 - progress) ** 3);
-    node.textContent = format(state.current);
-    if (progress < 1) state.frame = requestAnimationFrame(tick);
-  };
-  state.frame = requestAnimationFrame(tick);
+  // Render the real value immediately; animate its appearance, never a fictitious count.
+  const text = value === null || !Number.isFinite(value) ? "—" : format(value);
+  if (node.textContent === text) return;
+  cancelAnimationFrame(pendingMetrics.get(node) || 0);
+  node.textContent = text;
+  node.classList.remove("metric-changed");
+  if (enabled)
+    pendingMetrics.set(
+      node,
+      requestAnimationFrame(() => node.classList.add("metric-changed")),
+    );
 }

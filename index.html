@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,12 +8,66 @@
       name="description"
       content="Штиль — отзывы гостей, результаты команды и аналитика сервиса кофейни в Актау."
     />
-    <title>Штиль — на одной волне</title>
+    <title>Штиль — аналитика сервиса</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <script>
+      // Apply the stored or system theme before styles paint. No data is stored here.
+      (() => {
+        let theme;
+        try {
+          theme = localStorage.getItem("shtil-theme");
+        } catch {}
+        document.documentElement.dataset.theme = ["light", "dark"].includes(
+          theme,
+        )
+          ? theme
+          : matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+      })();
+    </script>
     <link rel="stylesheet" href="style.css" />
     <script type="module" src="app.js"></script>
   </head>
   <body>
+    <div class="caspian-background" aria-hidden="true">
+      <div class="sea-haze"></div>
+      <svg
+        class="caspian-sea"
+        viewBox="0 0 2400 1200"
+        preserveAspectRatio="none"
+      >
+        <defs>
+          <linearGradient id="caspian-depth" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" class="sea-color-top" />
+            <stop offset="1" class="sea-color-bottom" />
+          </linearGradient>
+        </defs>
+        <g class="sea-swell sea-far">
+          <path
+            d="M-400 510C-30 260 220 650 650 390S1400 180 1800 420S2400 250 2800 330V1500H-400Z"
+          />
+        </g>
+        <g class="sea-swell sea-mid">
+          <path
+            d="M-400 820C-80 470 380 760 740 600S1340 420 1800 650S2380 440 2800 560V1500H-400Z"
+          />
+        </g>
+        <g class="sea-swell sea-near">
+          <path
+            d="M-400 1010C10 730 400 1020 850 830S1470 600 1940 850S2440 710 2800 780V1500H-400Z"
+          />
+        </g>
+        <g class="sea-swell sea-foam">
+          <path
+            d="M-400 514C-30 264 220 654 650 394S1400 184 1800 424S2400 254 2800 334M-400 526C-30 276 220 666 650 406S1400 196 1800 436S2400 266 2800 346"
+          />
+          <path
+            d="M-400 827C-80 477 380 767 740 607S1340 427 1800 657S2380 447 2800 567"
+          />
+        </g>
+      </svg>
+    </div>
     <a class="skip-link" href="#main">Перейти к аналитике</a>
     <div class="app-shell">
       <aside class="sidebar">
@@ -31,25 +85,44 @@
         <div class="nav-caption">Рабочее пространство</div>
         <nav class="main-nav" aria-label="Разделы аналитики">
           <a class="nav-item is-active" href="#overview" aria-current="location"
-            ><span aria-hidden="true">◫</span> Обзор <small>01</small></a
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7" rx="1.5" />
+              <rect x="14" y="3" width="7" height="7" rx="1.5" />
+              <rect x="3" y="14" width="7" height="7" rx="1.5" />
+              <rect x="14" y="14" width="7" height="7" rx="1.5" />
+            </svg>
+            Обзор</a
           >
           <a class="nav-item" href="#team"
-            ><span aria-hidden="true">♧</span> Команда <small>02</small></a
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="8" r="3" />
+              <path
+                d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5"
+              />
+            </svg>
+            Команда</a
           >
           <a class="nav-item" href="#reviews"
-            ><span aria-hidden="true">☷</span> Отзывы <small>03</small></a
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M4 4h16v12H9l-5 4V4Z" />
+              <path d="M8 8h8M8 12h5" />
+            </svg>
+            Отзывы</a
           >
           <a class="nav-item" href="#channels"
-            ><span aria-hidden="true">↗</span> Каналы <small>04</small></a
+            ><svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 17 18 5M8 5h10v10M4 11v9h9" />
+            </svg>
+            Каналы</a
           >
         </nav>
         <div class="sidebar-sea" aria-hidden="true">
-          <span>43°39′ N<br />51°10′ E</span
-          ><svg viewBox="0 0 240 120">
+          <span class="sea-signature">На одной волне.</span
+          ><svg viewBox="0 0 240 100">
             <path
-              d="M-80 55Q-20 5 40 55T160 55T280 55T400 55M-80 70Q-20 20 40 70T160 70T280 70T400 70M-80 85Q-20 35 40 85T160 85T280 85T400 85M-80 100Q-20 50 40 100T160 100T280 100T400 100"
+              d="M-80 35Q-20 0 40 35T160 35T280 35T400 35M-80 50Q-20 15 40 50T160 50T280 50T400 50M-80 65Q-20 30 40 65T160 65T280 65T400 65"
             /></svg
-          ><small>Вдохновлено Каспием</small>
+          ><small>Каспий · Актау</small>
         </div>
         <div class="sidebar-bottom">
           <div class="connection">
@@ -68,10 +141,32 @@
       </aside>
       <main id="main" class="main-content">
         <header class="topbar">
-          <a class="mobile-brand" href="#overview">штиль.</a>
-          <div class="breadcrumb">Штиль <span>/</span> Аналитика команды</div>
+          <a class="mobile-brand" href="#overview"
+            ><span>штиль.</span
+            ><small id="mobile-scope">Обзор команды</small></a
+          >
+          <div class="breadcrumb">
+            <span>Штиль</span><span aria-hidden="true">/</span
+            ><span id="header-scope">Все сотрудники</span>
+          </div>
           <div class="topbar-actions">
-            <span class="live-label"><i></i> Обратная связь</span
+            <button
+              id="theme-toggle"
+              class="theme-toggle"
+              type="button"
+              aria-label="Включить тёмную тему"
+              aria-pressed="false"
+            >
+              <svg class="theme-moon" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M20.5 13.4A8.5 8.5 0 0 1 10.6 3.5 8.5 8.5 0 1 0 20.5 13.4Z"
+                /></svg
+              ><svg class="theme-sun" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" />
+                <path
+                  d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"
+                /></svg
+              ><span id="theme-label">Тёмная тема</span></button
             ><button
               id="refresh-btn"
               class="icon-button"
@@ -85,6 +180,7 @@
               </svg></button
             ><span
               class="workspace-avatar"
+              aria-hidden="true"
               aria-label="Рабочее пространство Штиль"
               >Ш</span
             >
@@ -94,10 +190,10 @@
           <section id="overview" class="overview-section">
             <div class="page-heading reveal">
               <div>
-                <p class="eyebrow">КАЧЕСТВО СЕРВИСА · АКТАУ</p>
-                <h1>На одной волне.</h1>
+                <p class="eyebrow">ШТИЛЬ · АКТАУ</p>
+                <h1>Обзор сервиса</h1>
                 <p class="page-intro">
-                  Слышать гостей. Поддерживать команду. Становиться лучше.
+                  Отзывы гостей, качество сервиса и результаты команды.
                 </p>
               </div>
               <div class="period-control">
@@ -166,7 +262,6 @@
                 </svg>
                 <div class="ocean-top">
                   <p id="rating-heading" class="card-kicker">Рейтинг команды</p>
-                  <span class="sea-pill"><i></i> CASPIAN SPIRIT</span>
                 </div>
                 <div class="rating-value">
                   <strong id="stat-avg-rating">—</strong
@@ -192,11 +287,11 @@
               </article>
               <article class="insight-card reveal">
                 <div class="card-title-row">
-                  <h2>Пульс сервиса</h2>
+                  <h2>Точки внимания</h2>
                   <span class="tiny-waves" aria-hidden="true">≈</span>
                 </div>
                 <p class="card-description">
-                  Внимание к деталям — в каждом показателе.
+                  Что важно проверить в выбранном периоде.
                 </p>
                 <div class="pulse-list">
                   <div>
@@ -215,10 +310,17 @@
                   </div>
                   <div>
                     <span class="metric-icon sand" aria-hidden="true">⌁</span
-                    ><span>QR-сканы<small>Интерес к обратной связи</small></span
+                    ><span>QR-сканы<small>За выбранный период</small></span
                     ><strong id="scan-count">—</strong>
                   </div>
                 </div>
+                <button
+                  id="review-attention-btn"
+                  class="attention-link"
+                  type="button"
+                >
+                  Посмотреть негативные отзывы <span aria-hidden="true">↗</span>
+                </button>
                 <p id="scope-note" class="scope-note">
                   Все сотрудники · весь период
                 </p>
@@ -228,8 +330,8 @@
               <article class="chart-card reveal">
                 <div class="card-title-row">
                   <div>
-                    <p class="eyebrow">КАЧЕСТВО В ДВИЖЕНИИ</p>
-                    <h2>Ритм обратной связи</h2>
+                    <p class="eyebrow">ПОСЛЕДНИЕ 14 ДНЕЙ</p>
+                    <h2>Динамика рейтинга</h2>
                   </div>
                   <span class="chart-legend"><i></i> Средняя оценка</span>
                 </div>
@@ -239,8 +341,8 @@
                 </p>
               </article>
               <article class="distribution-card reveal">
-                <p class="eyebrow">ГОЛОС ГОСТЕЙ</p>
-                <h2>Спектр впечатлений</h2>
+                <p class="eyebrow">ОЦЕНКИ ГОСТЕЙ</p>
+                <h2>Распределение оценок</h2>
                 <div id="distribution" class="distribution"></div>
                 <div class="positive-note">
                   <span aria-hidden="true">✦</span>
@@ -252,8 +354,8 @@
           <section id="team" class="team-section">
             <div class="section-heading reveal">
               <div>
-                <p class="eyebrow">ЛЮДИ ЗА ХОРОШИМ СЕРВИСОМ</p>
-                <h2>Команда Штиля</h2>
+                <p class="eyebrow">КОМАНДА</p>
+                <h2>Показатели сотрудников</h2>
               </div>
               <button id="reset-filter-btn" class="text-button" type="button">
                 Все сотрудники <span aria-hidden="true">↗</span>
@@ -312,8 +414,8 @@
           <section id="channels" class="channels-section">
             <div class="section-heading reveal">
               <div>
-                <p class="eyebrow">ТОЧКИ СОПРИКОСНОВЕНИЯ</p>
-                <h2>За пределами кофейни</h2>
+                <p class="eyebrow">ВНЕШНИЕ ПЛАТФОРМЫ</p>
+                <h2>Каналы переходов</h2>
               </div>
               <span class="count-label">Переходы на платформы</span>
             </div>

@@ -3,6 +3,7 @@ import { businessDate, emptySources, refreshSources } from "./src/data.js";
 import { dashboard } from "./src/analytics.js";
 import { renderDashboard, renderFeed, renderStatus } from "./src/view.js";
 import { initMotion } from "./src/motion.js";
+import { initTheme } from "./src/theme.js";
 
 const demo = new URLSearchParams(location.search).get("demo") === "1";
 const filters = { month: "all", name: null, negative: false, query: "" };
@@ -35,6 +36,7 @@ async function refresh() {
   }
 }
 
+initTheme();
 initMotion();
 render();
 document.getElementById("refresh-btn").addEventListener("click", refresh);
@@ -70,7 +72,26 @@ document.getElementById("load-more-btn").addEventListener("click", () => {
   limit += config.pageSize;
   renderFeed(model, filters, limit);
 });
-const navLinks = [...document.querySelectorAll(".main-nav a")];
+document
+  .getElementById("review-attention-btn")
+  .addEventListener("click", () => {
+    filters.negative = true;
+    filters.query = "";
+    document.getElementById("review-search").value = "";
+    limit = config.pageSize;
+    model = dashboard(sources, filters, businessDate());
+    renderFeed(model, filters, limit);
+    const target = document.getElementById("reviews");
+    target.scrollIntoView({
+      behavior: document.documentElement.classList.contains("motion-paused")
+        ? "auto"
+        : "smooth",
+    });
+    const heading = target.querySelector("h2");
+    heading.tabIndex = -1;
+    heading.focus({ preventScroll: true });
+  });
+const navLinks = [...document.querySelectorAll(".main-nav a, .mobile-nav a")];
 const sections = [...document.querySelectorAll("main section[id]")];
 if ("IntersectionObserver" in window) {
   const visible = new Map();

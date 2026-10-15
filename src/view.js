@@ -1,6 +1,6 @@
 import { formatName, usable } from "./analytics.js";
 import { config } from "./config.js";
-import { countTo, reveal } from "./motion.js";
+import { setMetric, reveal } from "./motion.js";
 
 const $ = (id) => document.getElementById(id);
 const decimal = (value) =>
@@ -233,11 +233,7 @@ function renderLeader(model, filters) {
         filters.name ? "ВЫБРАННЫЙ СОТРУДНИК" : "ЛИДЕР ВЫБРАННОГО ПЕРИОДА",
       ),
       el("h3", "", formatName(best.name)),
-      el(
-        "p",
-        "",
-        `${best.count} отзывов · по средней оценке, при равенстве — по числу отзывов`,
-      ),
+      el("p", "", `Средний рейтинг · отзывов: ${best.count}`),
     ]),
     el("div", "leader-result", null, [
       el("strong", "", decimal(best.avg)),
@@ -258,11 +254,11 @@ function renderTeam(model, filters, onSelect) {
     card.setAttribute("aria-pressed", String(filters.name === member.name));
     card.addEventListener("click", () => onSelect(member.name));
     const info = el("div", "", null, [
-      el("h3", "", formatName(member.name)),
+      el("span", "team-name", formatName(member.name)),
       el(
         "small",
         "",
-        `${model.reviewsReady ? member.count : "—"} отзывов · ${model.scansReady ? member.scans : "—"} сканов`,
+        `Отзывов: ${model.reviewsReady ? member.count : "—"} · сканов: ${model.scansReady ? member.scans : "—"}`,
       ),
     ]);
     const top = el("div", "team-card-top", null, [
@@ -393,23 +389,40 @@ function renderPlatforms(model) {
 }
 
 export function renderDashboard(model, filters, limit, onSelect) {
-  countTo($("stat-avg-rating"), model.avg, decimal);
-  countTo($("stat-total-reviews"), model.count, integer);
-  countTo($("negative-count"), model.negatives, integer);
-  countTo($("scan-count"), model.scans, integer);
-  countTo($("conversion"), model.conversion, (number) => `${decimal(number)}%`);
-  countTo($("week-rating"), model.weekAvg, (number) => `${decimal(number)} ★`);
+  setMetric($("stat-avg-rating"), model.avg, decimal);
+  setMetric($("stat-total-reviews"), model.count, integer);
+  setMetric($("negative-count"), model.negatives, integer);
+  setMetric($("scan-count"), model.scans, integer);
+  setMetric(
+    $("conversion"),
+    model.conversion,
+    (number) => `${decimal(number)}%`,
+  );
+  setMetric(
+    $("week-rating"),
+    model.weekAvg,
+    (number) => `${decimal(number)} ★`,
+  );
+  $("negative-count").classList.toggle("has-attention", model.negatives > 0);
+  $("review-attention-btn").disabled = !model.reviewsReady;
   $("week-delta").textContent =
     model.delta === null
       ? "Нет сравнения"
       : `${model.delta >= 0 ? "+" : "−"}${decimal(Math.abs(model.delta))}`;
   $("week-delta").title =
     "Среднее за последние 7 дней минус среднее за предыдущие 7 дней. Оба интервала ограничены выбранным периодом.";
-  $("scope-note").textContent =
+  $("rating-caption").textContent =
     `${filters.name ? formatName(filters.name) : "Все сотрудники"} · ${filters.month === "all" ? "всё время" : monthLabel(filters.month)}`;
-  $("rating-caption").textContent = filters.name
-    ? `Рейтинг сотрудника · ${formatName(filters.name)}`
-    : "Впечатления гостей в цифрах";
+  $("header-scope").textContent = $("rating-caption").textContent;
+  $("header-scope").title = $("rating-caption").textContent;
+  $("mobile-scope").textContent = filters.name
+    ? formatName(filters.name)
+    : filters.month === "all"
+      ? "Обзор команды"
+      : monthLabel(filters.month);
+  $("mobile-scope").title = $("rating-caption").textContent;
+  $("scope-note").textContent =
+    "Период и сотрудник учитываются во всех метриках.";
   $("chart-caption").textContent =
     `14 дней по ${dateLabel(model.end)} · пропуски означают отсутствие отзывов`;
   $("conversion").title =
