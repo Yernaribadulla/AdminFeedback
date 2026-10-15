@@ -54,7 +54,10 @@ test("filters, search and metrics use one period and employee scope", async ({
   await mockSheets(page);
   await loaded(page);
   await expect(page.locator("#stat-total-reviews")).toHaveText("3");
-  await page.locator("#month-select").selectOption("2026-10");
+  await page.getByRole("combobox", { name: "Период аналитики" }).click();
+  await page
+    .getByRole("option", { name: "октябрь 2026 г.", exact: true })
+    .click();
   await expect(page.locator("#stat-total-reviews")).toHaveText("2");
   await page.locator('[data-employee="dias"]').click();
   await expect(page.locator("#scan-count")).toHaveText("1");

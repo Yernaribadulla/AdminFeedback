@@ -4,6 +4,7 @@ import { dashboard } from "./src/analytics.js";
 import { renderDashboard, renderFeed, renderStatus } from "./src/view.js";
 import { initMotion } from "./src/motion.js";
 import { initTheme } from "./src/theme.js";
+import { initPeriodPicker } from "./src/period-picker.js";
 
 const demo = new URLSearchParams(location.search).get("demo") === "1";
 const filters = { month: "all", name: null, negative: false, query: "" };
@@ -38,6 +39,7 @@ async function refresh() {
 
 initTheme();
 initMotion();
+initPeriodPicker();
 render();
 document.getElementById("refresh-btn").addEventListener("click", refresh);
 document.getElementById("month-select").addEventListener("change", (event) => {

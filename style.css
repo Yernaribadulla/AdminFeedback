@@ -26,7 +26,7 @@
   --sea-mid: #89bdbd;
   --sea-near: #639fa8;
   --sea-foam: #f3fffa;
-  --sea-opacity: 0.54;
+  --sea-opacity: 0.68;
   --sea-glow: #ffffffba;
   --shadow: 0 4px 24px #0c374405;
   --focus: #16767a;
@@ -56,7 +56,7 @@
   --sea-mid: #1a6270;
   --sea-near: #237487;
   --sea-foam: #8acbc3;
-  --sea-opacity: 0.65;
+  --sea-opacity: 0.78;
   --sea-glow: #28565c55;
   --shadow: 0 8px 30px #0000000a;
   --focus: #a1e1d5;
@@ -161,9 +161,9 @@ button svg {
 .caspian-sea {
   position: absolute;
   width: calc(100% + 240px);
-  height: 105%;
+  height: 115%;
   left: -120px;
-  bottom: -12%;
+  bottom: -8%;
   opacity: var(--sea-opacity);
 }
 .sea-color-top {
@@ -177,29 +177,49 @@ button svg {
 }
 .sea-far {
   fill: var(--sea-far);
-  animation: caspian-far 24s ease-in-out infinite alternate;
+  animation: caspian-far 14s ease-in-out infinite alternate;
 }
 .sea-mid {
   fill: url("#caspian-depth");
   opacity: 0.65;
-  animation: caspian-mid 19s ease-in-out -8s infinite alternate;
+  animation: caspian-mid 11s ease-in-out -4s infinite alternate;
 }
 .sea-near {
   fill: var(--sea-near);
   opacity: 0.4;
-  animation: caspian-near 15s ease-in-out -4s infinite alternate;
+  animation: caspian-near 9s ease-in-out -2s infinite alternate;
 }
 .sea-foam {
   fill: none;
   stroke: var(--sea-foam);
   stroke-width: 1.5;
   opacity: 0.65;
-  animation: caspian-far 24s ease-in-out infinite alternate;
+  animation: caspian-far 14s ease-in-out infinite alternate;
+}
+.sea-ripples {
+  fill: none;
+  stroke: var(--sea-foam);
+  stroke-width: 1.8;
+  opacity: 0.48;
+  animation: caspian-current 24s linear infinite;
+}
+.sea-ripples path:nth-child(2) {
+  opacity: 0.5;
+}
+.sea-ripples path:nth-child(3) {
+  opacity: 0.2;
+}
+.sea-ripples-back {
+  opacity: 0.3;
+  stroke-width: 2;
+  animation-duration: 32s;
+  animation-direction: reverse;
 }
 .app-shell {
   position: relative;
   z-index: 1;
   min-height: 100vh;
+  animation: page-fade 950ms ease-out both;
 }
 
 /* A compact, calm navigation rail gives the data more room. */
@@ -462,6 +482,8 @@ button svg {
   padding: 34px 36px 0;
 }
 .page-heading {
+  position: relative;
+  z-index: 5;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -487,9 +509,98 @@ h1 {
   margin-top: 10px;
 }
 .period-control {
+  position: relative;
   display: grid;
   gap: 7px;
   min-width: 198px;
+}
+.period-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  color: var(--ink);
+  background: var(--surface);
+  font-size: 13px;
+  text-align: left;
+  transition:
+    border-color 180ms,
+    background-color 180ms;
+}
+.period-trigger:hover,
+.is-open .period-trigger {
+  border-color: var(--teal);
+  background: var(--surface-2);
+}
+.period-chevron {
+  width: 8px;
+  height: 8px;
+  margin: -4px 2px 0 4px;
+  flex: 0 0 auto;
+  border-right: 1.5px solid var(--teal);
+  border-bottom: 1.5px solid var(--teal);
+  transform: rotate(45deg);
+  transition: transform 220ms ease;
+}
+.is-open .period-chevron {
+  transform: translateY(4px) rotate(225deg);
+}
+.period-options {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max(100%, 230px);
+  max-width: calc(100vw - 28px);
+  max-height: min(320px, 55vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 14px 38px #051d2a24;
+  animation: period-open 200ms ease-out both;
+}
+.period-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.period-option + .period-option {
+  margin-top: 2px;
+}
+.period-option:hover,
+.period-option.is-highlighted {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+.period-option[aria-selected="true"] {
+  color: var(--teal-ink);
+  background: var(--teal-soft);
+  font-weight: 500;
+}
+.period-option[aria-selected="true"]::after {
+  content: "";
+  width: 6px;
+  height: 10px;
+  margin: -3px 3px 0 0;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
 }
 .period-control label {
   font-size: 12px;
@@ -1346,8 +1457,8 @@ h2 {
   opacity: 0;
   transform: translateY(13px);
   transition:
-    opacity 0.65s ease,
-    transform 0.65s cubic-bezier(0.2, 0.7, 0.2, 1);
+    opacity 0.85s ease,
+    transform 0.85s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .js-motion .reveal.is-visible {
   opacity: 1;
@@ -1355,6 +1466,19 @@ h2 {
 }
 .metric-changed {
   animation: metric-settle 0.3s ease both;
+}
+/* Only explicit theme changes transition; initial paint still uses the right palette. */
+.theme-transition,
+.theme-transition *,
+.theme-transition *::before,
+.theme-transition *::after {
+  transition:
+    color 550ms ease,
+    background-color 550ms ease,
+    border-color 550ms ease,
+    fill 550ms ease,
+    stroke 550ms ease,
+    stop-color 550ms ease !important;
 }
 .motion-paused *,
 .motion-paused *::before,
@@ -1376,26 +1500,49 @@ html.motion-paused {
 }
 @keyframes caspian-far {
   from {
-    transform: translate(-65px, 8px);
+    transform: translate(-150px, 28px);
   }
   to {
-    transform: translate(65px, -18px);
+    transform: translate(150px, -45px);
   }
 }
 @keyframes caspian-mid {
   from {
-    transform: translate(70px, 15px);
+    transform: translate(180px, 35px);
   }
   to {
-    transform: translate(-55px, -8px);
+    transform: translate(-150px, -30px);
   }
 }
 @keyframes caspian-near {
   from {
-    transform: translate(-45px, 10px);
+    transform: translate(-130px, 30px);
   }
   to {
-    transform: translate(60px, -25px);
+    transform: translate(150px, -55px);
+  }
+}
+@keyframes caspian-current {
+  to {
+    transform: translateX(-1200px);
+  }
+}
+@keyframes page-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes period-open {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 @keyframes sidebar-tide {

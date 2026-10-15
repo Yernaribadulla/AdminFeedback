@@ -24,6 +24,11 @@
           : matchMedia("(prefers-color-scheme: dark)").matches
             ? "dark"
             : "light";
+        let paused = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        try {
+          paused ||= localStorage.getItem("shtil-motion") === "off";
+        } catch {}
+        if (paused) document.documentElement.classList.add("motion-paused");
       })();
     </script>
     <link rel="stylesheet" href="style.css" />
@@ -64,6 +69,25 @@
           />
           <path
             d="M-400 827C-80 477 380 767 740 607S1340 427 1800 657S2380 447 2800 567"
+          />
+        </g>
+        <g class="sea-ripples">
+          <path
+            d="M-1200 300q300-150 600 0t600 0t600 0t600 0t600 0t600 0t600 0t600 0"
+          />
+          <path
+            d="M-1200 315q300-150 600 0t600 0t600 0t600 0t600 0t600 0t600 0t600 0"
+          />
+          <path
+            d="M-1200 350q300-150 600 0t600 0t600 0t600 0t600 0t600 0t600 0t600 0"
+          />
+        </g>
+        <g class="sea-ripples sea-ripples-back">
+          <path
+            d="M-1200 780q300-130 600 0t600 0t600 0t600 0t600 0t600 0t600 0t600 0"
+          />
+          <path
+            d="M-1200 800q300-130 600 0t600 0t600 0t600 0t600 0t600 0t600 0t600 0"
           />
         </g>
       </svg>

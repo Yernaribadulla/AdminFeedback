@@ -13,6 +13,7 @@ function preference() {
 export function initTheme() {
   const button = document.getElementById("theme-toggle");
   let choice = preference();
+  let transitionTimer;
   function apply(theme) {
     document.documentElement.dataset.theme = theme;
     const dark = theme === "dark";
@@ -32,6 +33,8 @@ export function initTheme() {
   const sync = () => apply(choice || (system.matches ? "dark" : "light"));
   sync();
   button.addEventListener("click", () => {
+    clearTimeout(transitionTimer);
+    document.documentElement.classList.add("theme-transition");
     const theme =
       document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     choice = theme;
@@ -41,6 +44,9 @@ export function initTheme() {
       /* Switching still works without persistence. */
     }
     apply(theme);
+    transitionTimer = setTimeout(() => {
+      document.documentElement.classList.remove("theme-transition");
+    }, 650);
   });
   system.addEventListener("change", () => {
     if (!choice) sync();
